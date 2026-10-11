@@ -93,6 +93,7 @@ namespace FrameSpool
         }
         protected override bool ProcessCmdKey(ref Message message,Keys keys)
         {
+            if(preview!=null&&!preview.IsDisposed&&preview.IsDragging&&(keys==Keys.PageUp||keys==Keys.PageDown||keys==Keys.Escape))return base.ProcessCmdKey(ref message,keys);
             if(ActiveControl is TextBoxBase||ActiveControl is NumericUpDown||ActiveControl is ComboBox)return base.ProcessCmdKey(ref message,keys);
             if(keys==Keys.Delete&&!printingScreen){RemoveFocused();return true;}
             if(printingScreen&&keys==Keys.Escape){ReturnToBrowser();return true;}

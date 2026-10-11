@@ -24,7 +24,7 @@ foreach ($taskPackage in @('microsoft.netcore.app.runtime.win-x64','microsoft.wi
 }
 # Remove stale files from the previous Framework build, within this exact output folder.
 Get-ChildItem -LiteralPath $taskOutput -File | Remove-Item -Force
-$taskCompilationOutput=Join-Path $taskRoot 'obj\publish-build\'
+$taskCompilationOutput=(Join-Path $taskRoot 'obj\publish-build').Replace('\','/')+'/'
 & $taskDotnet publish (Join-Path $taskRoot 'FrameSpool.csproj') -c Release -r win-x64 --self-contained true -o $taskOutput "-p:BaseOutputPath=$taskCompilationOutput" --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 foreach ($taskDoc in @('README.md', 'ROADMAP.md', 'ASSET_NOTICES.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md')) {

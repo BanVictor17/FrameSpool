@@ -1,4 +1,4 @@
-param([ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version='0.2.0')
+param([ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version='0.2.1')
 $ErrorActionPreference='Stop'
 $taskSource=Join-Path $PSScriptRoot 'dist\FrameSpool'
 $taskObject=Join-Path $PSScriptRoot 'obj\installer'
@@ -51,7 +51,7 @@ $taskDirectoryRoot.AppendChild($taskCleanup) | Out-Null
 $taskReference=$taskDocument.CreateElement('ComponentRef',$taskNamespace);$taskReference.SetAttribute('Id','DocumentationCleanup');$taskGroup.AppendChild($taskReference) | Out-Null
 $taskProductCode=[Guid]::new([byte[]]($taskHash.ComputeHash([Text.Encoding]::UTF8.GetBytes('FrameSpool MSI '+$Version)))[0..15])
 $taskHash.Dispose();$taskDocument.Save($taskManifest)
-& (Join-Path $taskWix 'candle.exe') -nologo -arch x64 ('-dProductCode='+$taskProductCode.ToString()) ('-dAppVersion='+$Version) ('-dSourceDir='+$taskSource) ('-dAppIcon='+(Join-Path $PSScriptRoot 'assets\application.ico')) ('-dLicenseRtf='+$taskRtf) -out ($taskObject+'\') (Join-Path $PSScriptRoot 'installer\FrameSpool.wxs') $taskManifest
+& (Join-Path $taskWix 'candle.exe') -nologo -arch x64 ('-dProductCode='+$taskProductCode.ToString()) ('-dAppVersion='+$Version) ('-dSourceDir='+$taskSource) ('-dAppIcon='+(Join-Path $PSScriptRoot 'assets\application.ico')) ('-dLicenseRtf='+$taskRtf) -out ($taskObject+'/') (Join-Path $PSScriptRoot 'installer\FrameSpool.wxs') $taskManifest
 if($LASTEXITCODE -ne 0){throw 'Installer compilation failed.'}
 $taskMsi=Join-Path $taskRelease ('FrameSpool-'+$Version+'-win-x64.msi')
 # ICE91 concerns changing ALLUSERS. This package deliberately supports only per-user installation.

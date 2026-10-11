@@ -1,6 +1,6 @@
 # FrameSpool roadmap
 
-Version 0.2.0 adds bundled RAW development and .NET runtime, ICC-to-sRGB conversion, 143 layouts including roll paper, oval masks, crop marks, EXIF/rotated captions, legacy template import, portable frame packages, browsing/Quick Print workflows, actual driver controls and an MSI. Complete behavioral/output equivalence with the reference application remains unverified.
+Version 0.2.1 adds background previews, safer resizing and screen transitions, validated drag-and-drop, reusable popup menus and valid print-dialog page ranges. It includes bundled RAW development and .NET runtime, ICC-to-sRGB conversion, 143 layouts including roll paper, oval masks, crop marks, captions, legacy template import, portable frame packages, Quick Print workflows, driver controls and an MSI. Complete behavioral/output equivalence with the reference application remains unverified.
 
 ## Remaining work
 
@@ -13,6 +13,6 @@ Version 0.2.0 adds bundled RAW development and .NET runtime, ICC-to-sRGB convers
 
 Synthetic photographs, Bayer DNG and ICC profiles test source preservation, RAW development/color/orientation, fixed-point arithmetic, layout/render geometry, crops, masks/captions/frames, workflow cancellation/preferences/shortcuts and actual Windows driver ticket/DEVMODE transport. The EXE is tested alone in an empty directory. MSI verification covers installation, upgrade and uninstall.
 
-Tests validate this implementation; they do not establish a complete 1:1 comparison. Releases remain previews while output and hardware checks are outstanding.
+Tests validate this implementation; they do not establish a complete 1:1 comparison. Version 0.2.1 is a regular release; the hardware and reference-output checks above remain outstanding.
 
 New source uses MIT. Asset ownership/redistribution permission and dependency terms are separate in ASSET_NOTICES.md and THIRD_PARTY_NOTICES.md.

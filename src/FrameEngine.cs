@@ -143,12 +143,15 @@ namespace FrameSpool
         public event Action<FrameElement> SelectionChanged;
         public event Action BeforeMove,AfterMove;
         PointF startingPoint;float startX,startY;bool dragging;
-        public FrameCanvas(){DoubleBuffered=true;BackColor=Color.FromArgb(225,227,232);}
+        public FrameCanvas(){DoubleBuffered=true;SetStyle(ControlStyles.ResizeRedraw,true);BackColor=Color.FromArgb(225,227,232);}
         public RectangleF Sheet{get{return Design==null?RectangleF.Empty:FrameSpool.LayoutEngine.PaperBounds(new RectangleF(15,15,Math.Max(1,Width-30),Math.Max(1,Height-30)),Design.ToLayout());}}
         protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);if(Design==null)return;var page=Sheet;Design.Draw(e.Graphics,page,null,false,null,true);if(Selected!=null){var r=Selected.Bounds;using(var pen=new Pen(Color.RoyalBlue,2){DashStyle=DashStyle.Dash})e.Graphics.DrawRectangle(pen,page.X+r.X*page.Width,page.Y+r.Y*page.Height,r.Width*page.Width,r.Height*page.Height);}}
         protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);var page=Sheet;if(page.IsEmpty)return;startingPoint=new PointF((e.X-page.X)/page.Width,(e.Y-page.Y)/page.Height);Selected=Design.Elements.LastOrDefault(item=>item.Bounds.Contains(startingPoint));if(SelectionChanged!=null)SelectionChanged(Selected);if(Selected!=null&&e.Button==MouseButtons.Left){startX=Selected.X;startY=Selected.Y;dragging=true;Capture=true;if(BeforeMove!=null)BeforeMove();}Invalidate();}
-        protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(!dragging||Selected==null)return;var page=Sheet;Selected.X=Math.Max(0,Math.Min(1-Selected.Width,(e.X-page.X)/page.Width-startingPoint.X+startX));Selected.Y=Math.Max(0,Math.Min(1-Selected.Height,(e.Y-page.Y)/page.Height-startingPoint.Y+startY));Invalidate();}
-        protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);dragging=false;Capture=false;if(AfterMove!=null)AfterMove();}
+        protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(!dragging||Selected==null||e.Button!=MouseButtons.Left)return;var page=Sheet;if(page.IsEmpty)return;Selected.X=Math.Max(0,Math.Min(1-Selected.Width,(e.X-page.X)/page.Width-startingPoint.X+startX));Selected.Y=Math.Max(0,Math.Min(1-Selected.Height,(e.Y-page.Y)/page.Height-startingPoint.Y+startY));Invalidate();}
+        void EndMove(){if(!dragging)return;dragging=false;Capture=false;if(AfterMove!=null)AfterMove();}
+        protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);EndMove();}
+        protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture)EndMove();}
+        protected override void OnResize(EventArgs e){base.OnResize(e);EndMove();Invalidate();}
     }
     public sealed class FrameEditor : Form
     {

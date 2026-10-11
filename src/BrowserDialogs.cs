@@ -379,10 +379,10 @@ namespace FrameSpool
                 {
                     Ui.Button(dialog, "Help", 252, 12, 95, 21, delegate { ShowHelp("Preferences"); });
                     CheckBox oneClick = Ui.Check(dialog, "One-Click Selection", 32, 35, 228, browserOneClickSelection, null);
-                    CheckBox splash = Ui.Check(dialog, "Do Not Show Splash Screen.", 32, 60, 250, browserDoNotShowSplash, null);
+
                     Button ok = Ui.Button(dialog, "OK", 169, 132, 85, 21, delegate {
                         browserOneClickSelection = oneClick.Checked;
-                        browserDoNotShowSplash = splash.Checked;
+                        browserDoNotShowSplash = true;
                         if (folderPhotos != null && !folderPhotos.IsDisposed)folderPhotos.OneClickSelection=browserOneClickSelection;
                         PersistBrowserPreferences(); dialog.Close();
                     });

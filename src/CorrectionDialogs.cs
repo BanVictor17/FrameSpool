@@ -11,16 +11,19 @@ namespace FrameSpool
     {
         public Bitmap ImageBitmap;
         public bool Fit = true;
+        readonly PreviewRenderer renderer=new PreviewRenderer();
+        internal bool RenderingReady { get { return renderer.Ready; } }
+        public void RenderPhoto(PhotoItem photo,bool corrected) { var snapshot=photo.Clone();renderer.Request(()=>PhotoEngine.RenderImage(snapshot,corrected)); }
         public event Action<PointF> ImageClicked;
-        public CorrectionCanvas(){DoubleBuffered=true;BackColor=Color.FromArgb(234,237,241);}
+        public CorrectionCanvas(){DoubleBuffered=true;SetStyle(ControlStyles.ResizeRedraw,true);BackColor=Color.FromArgb(234,237,241);renderer.Changed+=delegate{ImageBitmap=renderer.Image;Invalidate();};}
         public RectangleF ImageRectangle
         {
-            get { if(ImageBitmap==null)return RectangleF.Empty;float s=Fit?Math.Min((Width-12f)/ImageBitmap.Width,(Height-12f)/ImageBitmap.Height):1;return new RectangleF((Width-ImageBitmap.Width*s)/2,(Height-ImageBitmap.Height*s)/2,ImageBitmap.Width*s,ImageBitmap.Height*s); }
+            get { if(ImageBitmap==null)return RectangleF.Empty;float s=Fit?Math.Max(.001f,Math.Min((Width-12f)/ImageBitmap.Width,(Height-12f)/ImageBitmap.Height)):1;return new RectangleF((Width-ImageBitmap.Width*s)/2,(Height-ImageBitmap.Height*s)/2,ImageBitmap.Width*s,ImageBitmap.Height*s); }
         }
         public void SetImage(Bitmap bitmap){var previous=ImageBitmap;ImageBitmap=bitmap;if(previous!=null)previous.Dispose();Invalidate();}
         protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);if(ImageBitmap!=null){e.Graphics.InterpolationMode=InterpolationMode.HighQualityBicubic;var r=ImageRectangle;e.Graphics.DrawImage(ImageBitmap,r,new RectangleF(0,0,ImageBitmap.Width,ImageBitmap.Height),GraphicsUnit.Pixel);}}
         protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);var r=ImageRectangle;if(r.Contains(e.Location)&&ImageClicked!=null)ImageClicked(new PointF((e.X-r.X)/r.Width,(e.Y-r.Y)/r.Height));}
-        protected override void Dispose(bool disposing){if(disposing&&ImageBitmap!=null)ImageBitmap.Dispose();base.Dispose(disposing);}
+        protected override void Dispose(bool disposing){if(disposing){if(ImageBitmap!=null&&ImageBitmap!=renderer.Image)ImageBitmap.Dispose();ImageBitmap=null;renderer.Dispose();}base.Dispose(disposing);}
     }
     public partial class MainForm
     {
@@ -53,7 +56,7 @@ namespace FrameSpool
                 Action render=null;Action sync=null;Action store=null;
                 var rawButton=Ui.Button(f,"RAW Development...",12,464,153,21,delegate{ShowRawDevelopment(photo);render();});rawButton.Enabled=photo.IsRaw;
                 Ui.Button(f,"Histogram...",173,464,153,21,delegate{ShowHistogram(photo);});
-                render=delegate{try{var view=photo.Clone();view.Rotation=photo.Rotation+viewingRotation;canvas.SetImage(PhotoEngine.RenderImage(view,true));file.Text="File:       "+photo.FileName;path.Text="Location: "+Path.GetDirectoryName(photo.FilePath);}catch(Exception ex){MessageBox.Show(f,ex.Message,"Image Correct");}};
+                render=delegate{try{var view=photo.Clone();view.Rotation=photo.Rotation+viewingRotation;canvas.RenderPhoto(view,true);file.Text="File:       "+photo.FileName;path.Text="Location: "+Path.GetDirectoryName(photo.FilePath);}catch(Exception ex){MessageBox.Show(f,ex.Message,"Image Correct");}};
                 store=delegate{if(loading)return;var a=photo.Adjustments;a.Mode=none.Checked?"None":pim.Checked?"PIM":"PhotoEnhance";a.Scene=scene.Text;a.SceneLevel=level.Value;a.Brightness=brightness.Value;a.Monochrome=mono.Checked;a.Vivid=vivid.Checked;a.DigitalCorrection=noise.Checked;a.SmoothSkin=smooth.Checked;a.AutoRedEye=autoRed.Checked;mono.Enabled=scene.Text!="Night Scene";if(!mono.Enabled)a.Monochrome=false;scene.Enabled=level.Enabled=fix.Checked;standard.Enabled=smooth.Enabled=noise.Checked;render();};
                 sync=delegate{loading=true;rawButton.Enabled=photo.IsRaw;var a=photo.Adjustments;fix.Checked=a.Mode!="None"&&a.Mode!="PIM";none.Checked=a.Mode=="None";pim.Checked=a.Mode=="PIM";scene.SelectedItem=a.Scene;level.Value=Math.Max(-100,Math.Min(100,a.SceneLevel));brightness.Value=Math.Max(-100,Math.Min(100,a.Brightness));mono.Checked=a.Monochrome;vivid.Checked=a.Vivid;noise.Checked=a.DigitalCorrection;smooth.Checked=a.SmoothSkin;standard.Checked=!a.SmoothSkin;standard.Enabled=smooth.Enabled=noise.Checked;scene.Enabled=level.Enabled=fix.Checked;autoRed.Checked=a.AutoRedEye;comments.Text=photo.Comment;autoRed.Enabled=PhotoEngine.CanCorrectRedEye(photo);loading=false;render();};
                 fix.CheckedChanged+=delegate{store();};none.CheckedChanged+=delegate{store();};pim.CheckedChanged+=delegate{store();};scene.SelectedIndexChanged+=delegate{store();};level.ValueChanged+=delegate{store();};brightness.ValueChanged+=delegate{store();};mono.CheckedChanged+=delegate{store();};vivid.CheckedChanged+=delegate{store();};noise.CheckedChanged+=delegate{store();};autoRed.CheckedChanged+=delegate{store();};comments.TextChanged+=delegate{if(!loading)photo.Comment=comments.Text;};
@@ -87,7 +90,7 @@ namespace FrameSpool
                 var balance=Ui.Combo(dialog,new[]{"As Shot","Daylight","Cloudy","Shade","Fluorescent","Incandescent","Flash"},158,315,220,photo.Adjustments.RawWhiteBalance,null);
                 balance.Enabled=!photo.Adjustments.Monochrome;
                 Ui.Label(dialog,"Camera presets are used when available. Other presets use temperature estimates.",15,346,490,30);
-                Action render=delegate{try{photo.Adjustments.RawExposureSteps=(int)(exposure.Value*2);photo.Adjustments.RawWhiteBalance=balance.Text;previewImage.SetImage(PhotoEngine.RenderImage(photo,true));}catch(Exception ex){MessageBox.Show(dialog,ex.Message,"RAW Development");}};
+                Action render=delegate{try{photo.Adjustments.RawExposureSteps=(int)(exposure.Value*2);photo.Adjustments.RawWhiteBalance=balance.Text;previewImage.RenderPhoto(photo,true);}catch(Exception ex){MessageBox.Show(dialog,ex.Message,"RAW Development");}};
                 exposure.ValueChanged+=delegate{render();};balance.SelectedIndexChanged+=delegate{render();};
                 Ui.Button(dialog,"Reset",15,381,90,23,delegate{exposure.Value=0;balance.SelectedItem="As Shot";render();});
                 Ui.Button(dialog,"Close",415,381,90,23,delegate{dialog.Close();});render();dialog.ShowDialog(this);
@@ -105,7 +108,7 @@ namespace FrameSpool
                 Ui.Label(f,"Skin Radiance",551,260,220,16);var skin=Slider(f,592,277,137,0,5,photo.Adjustments.SkinRadiance);Ui.Label(f,"0",577,290,14,16);Ui.Label(f,"5",732,290,14,16);
                 Ui.Label(f,"Slimming Correction",551,330,220,16);var slim=Slider(f,592,349,137,0,3,photo.Adjustments.Slimming);
                 var direction=Ui.Combo(f,new[]{"Vertical","Horizontal"},592,387,137,photo.Adjustments.SlimmingDirection,null);
-                Action render=delegate{photo.Adjustments.FaceDefinition=face.Value;photo.Adjustments.SkinRadiance=skin.Value;photo.Adjustments.Slimming=slim.Value;photo.Adjustments.SlimmingDirection=direction.Text;original.SetImage(PhotoEngine.RenderImage(photo,false));modified.SetImage(PhotoEngine.RenderImage(photo,true));};
+                Action render=delegate{photo.Adjustments.FaceDefinition=face.Value;photo.Adjustments.SkinRadiance=skin.Value;photo.Adjustments.Slimming=slim.Value;photo.Adjustments.SlimmingDirection=direction.Text;original.RenderPhoto(photo,false);modified.RenderPhoto(photo,true);};
                 direction.SelectedIndexChanged+=delegate{render();};
                 face.ValueChanged+=delegate{render();};skin.ValueChanged+=delegate{render();};slim.ValueChanged+=delegate{render();};
                 single.CheckedChanged+=delegate{original.Visible=!single.Checked;modified.Bounds=single.Checked?new Rectangle(12,90,502,390):new Rectangle(268,90,246,390);};

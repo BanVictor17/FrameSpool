@@ -343,9 +343,13 @@ namespace FrameSpool
         public static Bitmap RenderPage(PhotoLayout layout, PhotoPage content, PrintOptions options, int dpi, bool corrected)
         {
             var bitmap = new Bitmap(Math.Max(1, (int)Math.Round(layout.Width * dpi / 360.0)), Math.Max(1, (int)Math.Round(layout.Height * dpi / 360.0)));
-            bitmap.SetResolution(dpi, dpi);
-            using (var g = Graphics.FromImage(bitmap)) DrawPage(g, new RectangleF(0, 0, bitmap.Width, bitmap.Height), layout, content, options, corrected, null);
-            return bitmap;
+            try
+            {
+                bitmap.SetResolution(dpi, dpi);
+                using (var g = Graphics.FromImage(bitmap)) DrawPage(g, new RectangleF(0, 0, bitmap.Width, bitmap.Height), layout, content, options, corrected, null);
+                return bitmap;
+            }
+            catch { bitmap.Dispose(); throw; }
         }
     }
 }
