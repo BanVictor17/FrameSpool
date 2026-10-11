@@ -1,5 +1,6 @@
 param([switch]$WixOnly)
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $taskTools = Join-Path $PSScriptRoot 'obj\tools'
 New-Item -ItemType Directory -Force -Path $taskTools | Out-Null
