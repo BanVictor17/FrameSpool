@@ -1,0 +1,9 @@
+dist/
+obj/
+bin/
+research/
+.vs/
+*.pdb
+*.user
+*.suo
+verification/

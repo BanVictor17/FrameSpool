@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+    <OutputType>WinExe</OutputType><RootNamespace>FrameSpool</RootNamespace><AssemblyName>FrameSpool</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion><OutputPath>dist\FrameSpool\</OutputPath><Optimize>true</Optimize>
+    <ApplicationIcon>assets\application.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" /><Reference Include="System.Core" /><Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" /><Reference Include="System.Web.Extensions" /><Reference Include="System.IO.Compression" />
+    <Compile Include="src\*.cs" />
+    <None Include="App.config" />
+    <EmbeddedResource Include="obj\FrameSpool.Assets.zip"><LogicalName>FrameSpool.Assets.zip</LogicalName></EmbeddedResource>
+  </ItemGroup>
+  <Target Name="PackBuiltInAssets" BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\pack-assets.ps1&quot;" />
+  </Target>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

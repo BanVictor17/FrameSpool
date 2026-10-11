@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.cs text eol=crlf
+*.ps1 text eol=crlf
+*.yml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.bmp binary
+*.png binary
+*.ico binary
+assets/** binary
