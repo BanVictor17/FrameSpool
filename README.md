@@ -6,7 +6,7 @@ FrameSpool runs from one executable. Its built-in artwork, icon and 135 layout d
 
 ## Run
 
-Build locally or download a successful Windows workflow's `FrameSpool-Windows` artifact from [GitHub Actions](https://github.com/BanVictor17/FrameSpool/actions). Extract it and open `FrameSpool.exe`. Keep the license and asset notices with redistributed copies.
+Download a preview ZIP from [Releases](https://github.com/BanVictor17/FrameSpool/releases), build locally, or download a successful Windows workflow's `FrameSpool-Windows` artifact from [GitHub Actions](https://github.com/BanVictor17/FrameSpool/actions). Extract it and open `FrameSpool.exe`. Keep the license and asset notices with redistributed copies.
 
 Requirements: Windows with .NET Framework 4.8 or later. Physical printing requires the printer manufacturer's Windows driver. The .NET runtime is supplied by Windows/the installed framework; this executable does not bundle a new runtime. The app has no dependency on REA, Node, Ghidra or a vendor photo-printing SDK.
 

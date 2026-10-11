@@ -3,6 +3,7 @@ name: Windows build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -37,3 +38,30 @@ jobs:
           name: FrameSpool-verification
           path: obj/verification/
           if-no-files-found: ignore
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified Windows build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: FrameSpool-Windows
+          path: release
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: source
+          persist-credentials: false
+      - name: Publish preview package
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          Compress-Archive -Path .\release\* -DestinationPath .\FrameSpool-Windows.zip
+          gh release create $env:GITHUB_REF_NAME .\FrameSpool-Windows.zip --verify-tag --title ("FrameSpool " + $env:GITHUB_REF_NAME + " preview") --notes-file .\source\RELEASE_NOTES.md --prerelease
+          if ($LASTEXITCODE -ne 0) { throw 'Preview publication failed.' }
