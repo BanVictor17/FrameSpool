@@ -58,13 +58,32 @@ namespace FrameSpool
         }
         public static void Capture(PrintDocument document,PrintOptions options)
         {options.DriverMode=Convert.ToBase64String(CurrentMode(document));options.DriverModePrinter=document.PrinterSettings.PrinterName;options.DriverModePaper=options.Paper;options.DriverModeLandscape=document.DefaultPageSettings.Landscape;}
+        public static void CaptureAccepted(PrintDocument document,PrintOptions options)
+        {
+            Capture(document,options);
+            options.DriverOptionsPrinter=options.DriverMedia=options.DriverQuality=options.DriverResolution="";
+            options.Source=document.DefaultPageSettings.PaperSource.SourceName;
+            options.Mode=options.PaperType="Printer Properties";
+            var capabilities=DriverCapabilities.Read(document);
+            if(capabilities.Error==null)
+            {
+                options.Borderless=capabilities.BorderlessSelected;
+                var media=capabilities.Media.Find(c=>c.Id==capabilities.Selected("PageMediaType"));
+                if(media!=null)options.PaperType=media.Label;
+                var quality=capabilities.Quality.Find(c=>c.Id==capabilities.Selected("PageOutputQuality"));
+                var resolution=capabilities.Resolution.Find(c=>c.Id==capabilities.Selected("PageResolution"));
+                if(quality!=null)options.Mode=quality.Label;else if(resolution!=null)options.Mode=resolution.Label;
+            }
+        }
         public static bool Configure(IWin32Window owner,PhotoLayout layout,PrintOptions options)
         {
             using(var document=new PrintDocument())
             {
                 document.PrinterSettings.PrinterName=options.Printer;
                 if(!document.PrinterSettings.IsValid){MessageBox.Show(owner,"Install and select the printer's Windows driver first.","Printer Properties");return false;}
-                PrinterProfile.Apply(document,layout,options);
+                // Properties must remain accessible even if a saved Print Schema
+                // selection is obsolete. Its complete native mode is authoritative.
+                PrinterProfile.Apply(document,layout,options,false);
                 IntPtr printer;if(!OpenPrinter(options.Printer,out printer,IntPtr.Zero))throw new Win32Exception();
                 try
                 {
@@ -79,9 +98,7 @@ namespace FrameSpool
                         if(result!=1)return false;
                         byte[] bytes=new byte[size];Marshal.Copy(buffer,bytes,0,size);
                         IntPtr handle=WriteHandle(bytes);try{document.PrinterSettings.SetHdevmode(handle);document.DefaultPageSettings.SetHdevmode(handle);}finally{GlobalFree(handle);}
-                        Capture(document,options);
-                        options.DriverMedia=options.DriverQuality=options.DriverResolution=options.DriverOptionsPrinter="";
-                        options.Source=document.DefaultPageSettings.PaperSource.SourceName;options.Mode="Printer Properties";options.PaperType="Printer Properties";
+                        CaptureAccepted(document,options);
                         return true;
                     }
                     finally{Marshal.FreeHGlobal(buffer);}

@@ -10,6 +10,7 @@ namespace FrameSpool
 {
     public static class Ui
     {
+        public static float Scale(Control control) { var form=control.FindForm() as DpiForm;return form==null?control.DeviceDpi/96f:form.UiScale; }
         public static Font Font(float pixels) { return new Font("Arial", pixels, FontStyle.Regular, GraphicsUnit.Pixel); }
         public static Label Label(Control parent, string text, int x, int y, int w, int h)
         { var c = new Label { Text = text, Bounds = new Rectangle(x, y, w, h), Font = Font(12), BackColor = Color.Transparent, AutoEllipsis = true }; parent.Controls.Add(c); return c; }
@@ -24,7 +25,7 @@ namespace FrameSpool
         public static NumericUpDown Number(Control parent, int x, int y, int w, int min, int max, decimal value, Action<int> changed)
         { var c = new NumericUpDown { Bounds = new Rectangle(x, y, w, 24), Font = Font(12), Minimum = min, Maximum = max, Value = Math.Max(min, Math.Min(max, value)) }; if(changed!=null)c.ValueChanged += delegate { changed((int)c.Value); }; parent.Controls.Add(c); return c; }
         public static Form Dialog(string title, int width, int height)
-        { return new Form { Text = title, ClientSize = new Size(width, height), Font = Font(12), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, StartPosition = FormStartPosition.CenterParent, BackColor = Color.FromArgb(252,252,254), AutoScaleMode = AutoScaleMode.None }; }
+        { return new DpiForm { Text = title, ClientSize = new Size(width, height), Font = Font(12), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, StartPosition = FormStartPosition.CenterParent, BackColor = Color.FromArgb(252,252,254), AutoScaleMode = AutoScaleMode.None }; }
     }
     public class TileView : ScrollableControl
     {
@@ -55,40 +56,41 @@ namespace FrameSpool
             DoubleBuffered = true; AutoScroll = true; BackColor = Color.White; TabStop = true;
             SetStyle(ControlStyles.Selectable, true);
         }
-        int Columns { get { return SelectionList ? 1 : Math.Max(1, (ClientSize.Width-20) / (TileSize+8)); } }
-        int CardWidth { get { return SelectionList ? Math.Max(85,ClientSize.Width-22) : TileSize; } }
-        int CardHeight { get { return SelectionList ? Math.Max(100,CardWidth+20) : TileSize+2; } }
+        int D(int n){return (int)Math.Round(n*Ui.Scale(this));}
+        int Columns { get { return SelectionList ? 1 : Math.Max(1, (ClientSize.Width-D(20)) / (D(TileSize)+D(8))); } }
+        int CardWidth { get { return SelectionList ? Math.Max(D(85),ClientSize.Width-D(22)) : D(TileSize); } }
+        int CardHeight { get { return SelectionList ? Math.Max(D(100),CardWidth+D(20)) : D(TileSize+2); } }
         public void RefreshPhotos() {
             var present=new HashSet<string>(Photos.Select(p=>Key(p)),StringComparer.OrdinalIgnoreCase);
             foreach(var key in thumbs.Keys.Where(k=>!present.Contains(k)).ToList()){thumbs[key].Dispose();thumbs.Remove(key);}
-            AutoScrollMinSize = new Size(0, ((Photos.Count + Columns-1)/Columns)*(CardHeight+8)+8); Invalidate();
+            AutoScrollMinSize = new Size(0, ((Photos.Count + Columns-1)/Columns)*(CardHeight+D(8))+D(8)); Invalidate();
         }
-        protected override void OnResize(EventArgs e) { base.OnResize(e); AutoScrollMinSize = new Size(0, ((Photos.Count + Columns-1)/Columns)*(CardHeight+8)+8); Invalidate(); }
-        Rectangle Card(int index) { return new Rectangle(5+(index%Columns)*(CardWidth+8), 5+(index/Columns)*(CardHeight+8)+AutoScrollPosition.Y, CardWidth,CardHeight); }
+        protected override void OnResize(EventArgs e) { base.OnResize(e); AutoScrollMinSize = new Size(0, ((Photos.Count + Columns-1)/Columns)*(CardHeight+D(8))+D(8)); Invalidate(); }
+        Rectangle Card(int index) { return new Rectangle(D(5)+(index%Columns)*(CardWidth+D(8)), D(5)+(index/Columns)*(CardHeight+D(8))+AutoScrollPosition.Y, CardWidth,CardHeight); }
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e); e.Graphics.Clear(BackColor); e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
             // Retain only visible thumbnails and a small working set while scrolling.
             if(thumbs.Count>96){var visible=new HashSet<string>(Photos.Where((p,i)=>Card(i).Bottom>=0&&Card(i).Top<=Height).Select(p=>Key(p)));foreach(var key in thumbs.Keys.Where(k=>!visible.Contains(k)).ToList()){thumbs[key].Dispose();thumbs.Remove(key);}}
-            using (var font = Ui.Font(10))
+            using (var font = Ui.Font(10*Ui.Scale(this)))
             for(int i=0;i<Photos.Count;i++)
             {
                 var p=Photos[i]; var r=Card(i); if(r.Bottom<0 || r.Top>Height)continue;
                 using(var fill=new SolidBrush(p.Copies>0&&!SelectionList?Color.FromArgb(130,177,244):Color.FromArgb(225,226,227))) e.Graphics.FillRectangle(fill,r);
                 using(var pen=new Pen(p==FocusPhoto?Color.RoyalBlue:Color.Silver,p==FocusPhoto?2:1)) e.Graphics.DrawRectangle(pen,r.X,r.Y,r.Width,r.Height);
-                var imageBox=new Rectangle(r.X+5,r.Y+5,r.Width-10,r.Height-29);
+                var imageBox=new Rectangle(r.X+D(5),r.Y+D(5),r.Width-D(10),r.Height-D(29));
                 e.Graphics.FillRectangle(Brushes.White,imageBox);
                 Bitmap image; if(!thumbs.TryGetValue(Key(p),out image))LoadThumbnail(p);
                 if(image!=null) { float scale=Math.Min((float)imageBox.Width/image.Width,(float)imageBox.Height/image.Height); var dest=new RectangleF(imageBox.X+(imageBox.Width-image.Width*scale)/2,imageBox.Y+(imageBox.Height-image.Height*scale)/2,image.Width*scale,image.Height*scale); e.Graphics.DrawImage(image,dest); }
-                TextRenderer.DrawText(e.Graphics,p.FileName,font,new Rectangle(r.X+4,r.Bottom-20,r.Width-30,17),Color.Black,TextFormatFlags.EndEllipsis);
-                TextRenderer.DrawText(e.Graphics,"x "+p.Copies,font,new Rectangle(r.Right-30,r.Bottom-20,28,17),Color.Black,TextFormatFlags.Right);
+                TextRenderer.DrawText(e.Graphics,p.FileName,font,new Rectangle(r.X+D(4),r.Bottom-D(20),r.Width-D(30),D(17)),Color.Black,TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(e.Graphics,"x "+p.Copies,font,new Rectangle(r.Right-D(30),r.Bottom-D(20),D(28),D(17)),Color.Black,TextFormatFlags.Right);
                 if(p==FocusPhoto&&!SelectionList)
                 {
-                    e.Graphics.FillRectangle(Brushes.White,r.X+5,r.Bottom-25,r.Width-10,21);
-                    using(var brush=new SolidBrush(Color.FromArgb(62,76,84))) { e.Graphics.FillRectangle(brush,r.X+7,r.Bottom-23,31,17); e.Graphics.FillRectangle(brush,r.Right-38,r.Bottom-23,31,17); }
-                    using(var symbolFont=Ui.Font(16)){TextRenderer.DrawText(e.Graphics,"−",symbolFont,new Rectangle(r.X+7,r.Bottom-25,31,20),Color.White,TextFormatFlags.HorizontalCenter);
-                    TextRenderer.DrawText(e.Graphics,"+",symbolFont,new Rectangle(r.Right-38,r.Bottom-25,31,20),Color.White,TextFormatFlags.HorizontalCenter);}
-                    TextRenderer.DrawText(e.Graphics,p.Copies.ToString(),font,new Rectangle(r.X+39,r.Bottom-23,r.Width-78,18),Color.Black,TextFormatFlags.HorizontalCenter);
+                    e.Graphics.FillRectangle(Brushes.White,r.X+D(5),r.Bottom-D(25),r.Width-D(10),D(21));
+                    using(var brush=new SolidBrush(Color.FromArgb(62,76,84))) { e.Graphics.FillRectangle(brush,r.X+D(7),r.Bottom-D(23),D(31),D(17)); e.Graphics.FillRectangle(brush,r.Right-D(38),r.Bottom-D(23),D(31),D(17)); }
+                    using(var symbolFont=Ui.Font(16*Ui.Scale(this))){TextRenderer.DrawText(e.Graphics,"−",symbolFont,new Rectangle(r.X+D(7),r.Bottom-D(25),D(31),D(20)),Color.White,TextFormatFlags.HorizontalCenter);
+                    TextRenderer.DrawText(e.Graphics,"+",symbolFont,new Rectangle(r.Right-D(38),r.Bottom-D(25),D(31),D(20)),Color.White,TextFormatFlags.HorizontalCenter);}
+                    TextRenderer.DrawText(e.Graphics,p.Copies.ToString(),font,new Rectangle(r.X+D(39),r.Bottom-D(23),r.Width-D(78),D(18)),Color.Black,TextFormatFlags.HorizontalCenter);
                 }
             }
         }
@@ -96,7 +98,7 @@ namespace FrameSpool
         {
             base.OnMouseDown(e); Focus();
             for(int i=0;i<Photos.Count;i++) { var r=Card(i); if(!r.Contains(e.Location))continue; var p=Photos[i]; bool wasFocused=p==FocusPhoto; FocusPhoto=p; if(PhotoFocused!=null)PhotoFocused(p);
-                if(e.Button==MouseButtons.Left && !SelectionList) { if(wasFocused&&e.Y>=r.Bottom-25) { if(e.X<=r.X+38)p.Copies=Math.Max(0,p.Copies-1); else if(e.X>=r.Right-38)p.Copies=Math.Min(99,p.Copies+1); } else if(p.Copies==0&&OneClickSelection)p.Copies=1; if(CopiesChanged!=null)CopiesChanged(p); }
+                if(e.Button==MouseButtons.Left && !SelectionList) { if(wasFocused&&e.Y>=r.Bottom-D(25)) { if(e.X<=r.X+D(38))p.Copies=Math.Max(0,p.Copies-1); else if(e.X>=r.Right-D(38))p.Copies=Math.Min(99,p.Copies+1); } else if(p.Copies==0&&OneClickSelection)p.Copies=1; if(CopiesChanged!=null)CopiesChanged(p); }
                 if(e.Button==MouseButtons.Left&&(SelectionList||AllowPhotoDrag)){dragPhoto=p;dragStart=e.Location;}
                 Invalidate(); break;
             }
@@ -139,7 +141,7 @@ namespace FrameSpool
         }
         public void RefreshScale()
         {
-            AutoScrollMinSize=LayoutDefinition==null||fitToWindow?Size.Empty:new Size((int)(LayoutDefinition.Width*96/360)+24,(int)(LayoutDefinition.Height*96/360)+22);
+            AutoScrollMinSize=LayoutDefinition==null||fitToWindow?Size.Empty:new Size((int)(LayoutDefinition.Width*96*Ui.Scale(this)/360)+24,(int)(LayoutDefinition.Height*96*Ui.Scale(this)/360)+22);
             QueueRender();Invalidate();
         }
         protected override void OnResize(EventArgs e){base.OnResize(e);if(renderer!=null)QueueRender();}
@@ -154,7 +156,7 @@ namespace FrameSpool
             bool clear=renderedPage!=Page||renderedLayout!=layout;renderedPage=Page;renderedLayout=layout;
             renderer.Request(()=>FrameSpool.LayoutEngine.RenderPage(layout,page,options,dpi,corrected),clear);
         }
-        public RectangleF Sheet { get { if(LayoutDefinition==null)return RectangleF.Empty;if(fitToWindow)return FrameSpool.LayoutEngine.PaperBounds(new RectangleF(12,10,Math.Max(1,ClientSize.Width-24),Math.Max(1,ClientSize.Height-22)),LayoutDefinition);float w=LayoutDefinition.Width*96/360,h=LayoutDefinition.Height*96/360;return new RectangleF(Math.Max(12,(ClientSize.Width-w)/2)+AutoScrollPosition.X,Math.Max(10,(ClientSize.Height-h)/2)+AutoScrollPosition.Y,w,h); } }
+        public RectangleF Sheet { get { if(LayoutDefinition==null)return RectangleF.Empty;if(fitToWindow)return FrameSpool.LayoutEngine.PaperBounds(new RectangleF(12,10,Math.Max(1,ClientSize.Width-24),Math.Max(1,ClientSize.Height-22)),LayoutDefinition);float w=LayoutDefinition.Width*96*Ui.Scale(this)/360,h=LayoutDefinition.Height*96*Ui.Scale(this)/360;return new RectangleF(Math.Max(12,(ClientSize.Width-w)/2)+AutoScrollPosition.X,Math.Max(10,(ClientSize.Height-h)/2)+AutoScrollPosition.Y,w,h); } }
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);if(LayoutDefinition==null)return;var sheet=Sheet;

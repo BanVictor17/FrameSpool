@@ -9,7 +9,7 @@ namespace FrameSpool
     // the full driver DEVMODE for additional settings chosen in Properties.
     public static class PrinterProfile
     {
-        public static void Apply(PrintDocument document, PhotoLayout layout, PrintOptions options)
+        public static void Apply(PrintDocument document, PhotoLayout layout, PrintOptions options,bool validateChoices=true)
         {
             var page=document.DefaultPageSettings;
             bool nativeMode=DriverSettings.Apply(document,options);
@@ -29,11 +29,11 @@ namespace FrameSpool
                     PrinterResolutionKind requested=options.Mode=="Draft"?PrinterResolutionKind.Draft:options.Mode=="Text"?PrinterResolutionKind.Low:options.Mode=="Text & Image"?PrinterResolutionKind.Medium:PrinterResolutionKind.High;
                     resolution=resolutions.FirstOrDefault(r=>r.Kind==requested);
                 }
-                if(resolution!=null && options.Mode!="Printer Properties")page.PrinterResolution=resolution;
+                if(resolution!=null && options.Mode!="Printer Properties" && !nativeMode)page.PrinterResolution=resolution;
             }
             else page.PaperSize=new PaperSize(options.Paper,width,height);
             page.Margins=new Margins(0,0,0,0);
-            if(document.PrinterSettings.IsValid)DriverCapabilities.Apply(document,options);
+            if(validateChoices&&document.PrinterSettings.IsValid)DriverCapabilities.Apply(document,options);
         }
         public static void EnsurePageFormat(PrintDocument document,PhotoLayout layout,PrintOptions options)
         {

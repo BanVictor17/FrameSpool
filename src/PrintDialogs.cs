@@ -93,8 +93,12 @@ namespace FrameSpool
                 foreach(string code in order.Concat(FrameSpool.LayoutEngine.Catalog.Select(l=>l.Paper)).Distinct())
                     if(FrameSpool.LayoutEngine.ForPaper(code).Count>0)papers.Items.Add(new PaperChoice{Code=code,Label=PaperLabel(code)});
                 papers.SelectedItem=papers.Items.Cast<PaperChoice>().FirstOrDefault(p=>p.Code==staged.Paper)??papers.Items[0];
+                bool loading=false,driverChanged=false;
+                EventHandler markChanged=delegate{if(!loading)driverChanged=true;};
+                media.SelectedIndexChanged+=markChanged;quality.SelectedIndexChanged+=markChanged;resolution.SelectedIndexChanged+=markChanged;borderless.CheckedChanged+=markChanged;
                 Action<bool> load=delegate(bool native)
                 {
+                    loading=true;
                     staged.Printer=printers.Text;var paper=papers.SelectedItem as PaperChoice;if(paper!=null)staged.Paper=paper.Code;
                     var available=new List<string>();var reported=new List<string>();DriverCapabilities capabilities=null;
                     try
@@ -123,6 +127,7 @@ namespace FrameSpool
                     borderless.Enabled=capabilities.SupportsBorderless;
                     borderless.Checked=capabilities.SupportsBorderless&&(native||!saved?capabilities.BorderlessSelected:staged.Borderless);
                     information.Text=capabilities.Error==null?"These options are reported and validated by the selected Windows driver.\r\n\r\nUse Properties for additional driver settings, including borderless expansion, colour management and roll-paper limits.":"This driver does not expose Print Schema options. Use Properties to select media, quality and borderless settings.\r\n\r\n"+capabilities.Error;
+                    loading=false;driverChanged=false;
                     tooltips.SetToolTip(borderless,borderless.Enabled?"Supported by the selected driver":"Use Properties if this driver provides borderless printing.");
                 };
                 Ui.Button(dialog,"Properties...",190,479,95,23,delegate
@@ -139,11 +144,11 @@ namespace FrameSpool
                 staged.Printer=printers.Text;staged.Source=sources.Text;staged.Paper=selectedPaper==null?staged.Paper:selectedPaper.Code;
                 staged.PaperType=media.Text;staged.Mode=quality.Text;staged.Borderless=borderless.Enabled&&borderless.Checked;
                 staged.DriverMedia=SelectedDriverId(media);staged.DriverQuality=SelectedDriverId(quality);staged.DriverResolution=SelectedDriverId(resolution);
-                staged.DriverOptionsPrinter=media.Enabled||quality.Enabled||resolution.Enabled||borderless.Enabled?staged.Printer:"";
+                staged.DriverOptionsPrinter=driverChanged&&(media.Enabled||quality.Enabled||resolution.Enabled||borderless.Enabled)?staged.Printer:"";
                 // Validate the requested combination before saving it.
-                try{using(var document=new PrintDocument()){document.PrinterSettings.PrinterName=staged.Printer;if(document.PrinterSettings.IsValid)PrinterProfile.Apply(document,FrameSpool.LayoutEngine.ForPaper(staged.Paper).First(),staged);}}
+                try{using(var document=new PrintDocument()){document.PrinterSettings.PrinterName=staged.Printer;if(document.PrinterSettings.IsValid){PrinterProfile.Apply(document,FrameSpool.LayoutEngine.ForPaper(staged.Paper).First(),staged);DriverSettings.CaptureAccepted(document,staged);}}}
                 catch(Exception ex){MessageBox.Show(this,ex.Message,"Printer Settings",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
-                CopyOptions(staged,Options);
+                CopyOptions(staged,Options);SavePreferences();
                 if(changed){CurrentLayout=FrameSpool.LayoutEngine.ForPaper(Options.Paper).FirstOrDefault();pageIndex=0;if(photoLayoutRadio!=null)photoLayoutRadio.Checked=true;FillLayouts(false);}
                 UpdatePrinterSummary();UpdatePage();
             }

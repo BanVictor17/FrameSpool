@@ -153,7 +153,7 @@ namespace FrameSpool
         protected override void OnMouseCaptureChanged(EventArgs e){base.OnMouseCaptureChanged(e);if(!Capture)EndMove();}
         protected override void OnResize(EventArgs e){base.OnResize(e);EndMove();Invalidate();}
     }
-    public sealed class FrameEditor : Form
+    public sealed class FrameEditor : DpiForm
     {
         public FrameDesign Design;
         FrameCanvas canvas;ListBox objects;TextBox name,text;

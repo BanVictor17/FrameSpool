@@ -187,7 +187,8 @@ namespace FrameSpool
                 mouseOver ? System.Windows.Forms.VisualStyles.PushButtonState.Hot :
                 System.Windows.Forms.VisualStyles.PushButtonState.Normal);
 
-            Rectangle rectangle = captionRectangle.IsEmpty ? ClientRectangle : captionRectangle;
+            float scale=Ui.Scale(this);
+            Rectangle rectangle = captionRectangle.IsEmpty ? ClientRectangle : new Rectangle((int)Math.Round(captionRectangle.X*scale),(int)Math.Round(captionRectangle.Y*scale),(int)Math.Round(captionRectangle.Width*scale),(int)Math.Round(captionRectangle.Height*scale));
             TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.WordBreak | TextFormatFlags.PreserveGraphicsClipping;
             if (captionAlignment == ContentAlignment.TopCenter || captionAlignment == ContentAlignment.MiddleCenter || captionAlignment == ContentAlignment.BottomCenter)
                 flags |= TextFormatFlags.HorizontalCenter;
@@ -197,7 +198,7 @@ namespace FrameSpool
                 flags |= TextFormatFlags.VerticalCenter;
             else if (captionAlignment == ContentAlignment.BottomLeft || captionAlignment == ContentAlignment.BottomCenter || captionAlignment == ContentAlignment.BottomRight)
                 flags |= TextFormatFlags.Bottom;
-            using (Font font = new Font("Arial", textPixelSize, textBold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel))
+            using (Font font = new Font("Arial", textPixelSize*scale, textBold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel))
                 TextRenderer.DrawText(e.Graphics, Text, font, rectangle, Enabled ? ForeColor : Color.FromArgb(136, 136, 136), flags);
         }
 

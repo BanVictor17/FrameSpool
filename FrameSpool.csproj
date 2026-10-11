@@ -8,8 +8,8 @@
     <SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile>
     <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract><EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <PublishTrimmed>false</PublishTrimmed><DebugType>embedded</DebugType><Version>0.2.1</Version>
-    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <PublishTrimmed>false</PublishTrimmed><DebugType>embedded</DebugType><Version>0.2.2</Version>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="src\*.cs" />

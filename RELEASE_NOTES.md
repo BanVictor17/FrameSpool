@@ -1,23 +1,14 @@
-FrameSpool 0.2.1 improves responsiveness and fixes reported UI and printing failures.
+FrameSpool 0.2.2 fixes printer configuration and laptop scaling, and adds GitHub updates.
 
-- Background thumbnail, page and correction rendering keeps resizing, zooming and sliders responsive. Rapid changes discard stale results and release images safely when a window closes.
-- Buffered redraws and atomic screen changes remove remnants of the previous screen. Footer spacing and resize bounds are corrected.
-- The app opens directly into photo selection, without the additional startup window.
-- Valid initial page ranges fix the Microsoft Print to PDF "FromPage is out of range" error. Driver setup and dialog failures are handled inside the print workflow.
-- Reusable popup menus fix the disposed ContextMenuStrip crash.
-- Drag-and-drop validates source pages, slots and targets. Invalid/cancelled drops keep the photo in place; use right-click > Clear Settings to remove it. Frame dragging ends safely on capture loss or resize.
+- Fixes the false “printer rejected this combination” error: successfully resolved driver settings are accepted. Properties stays accessible when saved choices are obsolete.
+- Saves accepted media, quality, resolution, source and private driver settings immediately when settings or the print dialog are accepted. Future jobs restore the native configuration without stale overrides, including after a failed job.
+- Scales fonts, controls, artwork, thumbnails and layout lists at Windows 125%, 150% and 200% scaling, and adapts when moving between monitors. Smaller displays can scroll the workspace.
+- Adds Help > Check for Updates and an About button. Stable GitHub downloads are verified against their SHA256 digests before updating and restarting. Portable copies are replaced atomically with rollback; installed copies upgrade through MSI, retaining their install directory.
 
-Downloads:
-- Portable EXE: one self-contained Windows 10/11 x64 executable, including .NET, artwork, layouts, RAW decoder, licenses and decoder source.
-- MSI: per-user install, Start menu shortcut, upgrade and uninstall support. No separate runtime prerequisite.
-- Portable ZIP: the same app with documentation and notices. SHA256SUMS.txt verifies downloads.
+Download the portable EXE for a single self-contained Windows 10/11 x64 app, or the MSI for a per-user installation with Start menu shortcut and uninstall support. The ZIP includes documentation and notices. Existing v0.2.1 users must download v0.2.2 manually to get the updater.
 
-Includes camera RAW development, exposure/white balance, RGB histogram, embedded RGB ICC conversion to sRGB, 143 layouts including eight roll formats, oval masks, crop marks, EXIF/rotated captions, EPPIF 3.1 template import and portable .fspframe packages.
+Preferences and frames survive updates. Restarting closes the current photo selection. Updates are requested manually and require internet access and a writable app folder. The app runs offline otherwise.
 
-Browsing includes shell folder icons, keyboard shortcuts, saved preferences, cancellable batches and exports. Quick Print A/B supports desktop shortcuts and dropped photos/folders. Zero page copies skips output. Media/quality/resolution/borderless controls use the installed Windows driver's capabilities; Properties retains additional device-specific settings.
+Verification covers synthetic RAW/ICC/layout/workflow fixtures, Windows printer setting round trips, four DPI scales, download cancellation/corruption and rollback, actual portable helper replacement, MSI install/helper upgrade/uninstall, and Microsoft Print to PDF output.
 
-The portable app and MSI are verified automatically with synthetic RAW/ICC/layout/workflow fixtures and Windows driver round trips. MSI verification exercises install, major upgrade and uninstall.
-
-Physical L8050 output and complete reference equivalence remain untested. PRINT Image Matching, exact proprietary correction algorithms, old/multipage PIF and arbitrary colored EFF remain unavailable. See ROADMAP.md.
-
-New code is MIT licensed. Third-party artwork, .NET and LibRaw have separate terms and notices, embedded and included with distributions. This is a regular release; binaries are unsigned.
+Physical L8050 output still needs testing with the updated app. Complete original-app output equivalence, PRINT Image Matching, exact proprietary correction algorithms and some old template formats remain unverified or unavailable; see ROADMAP.md. New code is MIT; redistributed artwork and dependencies have separate notices. This is a regular release; binaries are unsigned.

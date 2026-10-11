@@ -10,11 +10,12 @@ namespace FrameSpool
         [STAThread]
         static int Main(string[] args)
         {
-            Application.SetHighDpiMode(HighDpiMode.SystemAware);
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
             Application.ThreadException+=delegate(object s,System.Threading.ThreadExceptionEventArgs e){ReportError(e.Exception);};
             try
             {
+                if(args.Length==2&&args[0]=="--apply-update")return AppUpdates.Apply(Path.GetFullPath(args[1]));
                 if(args.Length>0&&args[0]=="--self-test")return Verification.Run(args.Length>1?args[1]:Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"verification"));
                 if(args.Length>0&&args[0]=="--print-test")return Verification.PrintPdfTest(args.Length>1?args[1]:Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"verification"));
                 if(args.Length==3&&args[0]=="--capture-screenshots")return MainForm.CaptureScreenshots(Path.GetFullPath(args[1]),Path.GetFullPath(args[2]));

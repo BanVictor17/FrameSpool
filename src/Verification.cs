@@ -258,6 +258,7 @@ namespace FrameSpool
                 MainForm.VerifyVisuals(directory,fixture,checks);
                 MainForm.VerifyWorkflows(directory,fixture,checks);
                 DriverVerification.Run(directory,checks);
+                UpdateVerification.Run(directory,checks);
                 Check(checks,"Driver mode rejects truncated or corrupt buffers",!DriverSettings.IsValidMode(new byte[20])&&!DriverSettings.IsValidMode(new byte[72]));
                 string pdfPrinter=System.Drawing.Printing.PrinterSettings.InstalledPrinters.Cast<string>().FirstOrDefault(p=>p=="Microsoft Print to PDF");
                 if(pdfPrinter!=null)

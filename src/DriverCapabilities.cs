@@ -28,7 +28,7 @@ namespace FrameSpool
         public List<DriverChoice> Quality{get{return Choices("PageOutputQuality");}}
         public List<DriverChoice> Resolution{get{return Choices("PageResolution");}}
         public bool SupportsBorderless{get{return Choices("PageBorderless").Any(c=>c.Id==Psk+"Borderless")&&Choices("PageBorderless").Any(c=>c.Id==Psk+"None");}}
-        public bool BorderlessSelected{get{return Selected("PageBorderless")==Psk+"Borderless";}}
+        public bool BorderlessSelected{get{return Selected("PageBorderless")== (Psk+"Borderless").ToString();}}
         List<DriverChoice> Choices(string name){List<DriverChoice> value;return features.TryGetValue(name,out value)?value:new List<DriverChoice>();}
         public string Selected(string name){string value;return selected.TryGetValue(name,out value)?value:"";}
         static XName Qualified(XElement context,string value)
@@ -120,7 +120,9 @@ namespace FrameSpool
                 var basis=converter.ConvertDevModeToPrintTicket(DriverSettings.CurrentMode(document),PrintTicketScope.JobScope);
                 var requested=new PrintTicket(stream);
                 var result=queue.MergeAndValidatePrintTicket(basis,requested,PrintTicketScope.JobScope);
-                if(result.ConflictStatus==ConflictStatus.ConflictResolved)throw new InvalidOperationException("The printer rejected this combination of media, quality, resolution or borderless settings. Open Printer Settings and choose compatible options in Properties.");
+                // ConflictResolved is a successful validation: the driver supplied a
+                // viable combination. Keep that result instead of rejecting every job.
+                if(result.ValidatedPrintTicket==null)throw new InvalidOperationException("The driver did not return validated printer settings. Use Printer Properties.");
                 DriverSettings.SetMode(document,converter.ConvertPrintTicketToDevMode(result.ValidatedPrintTicket,BaseDevModeType.UserDefault,PrintTicketScope.JobScope));
             }
         }

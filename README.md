@@ -3,7 +3,7 @@
 **The familiar photo-printing workflow, with broader printer support.**
 
 [![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078D4?logo=windows)](https://github.com/BanVictor17/FrameSpool/releases)
-[![Release](https://img.shields.io/badge/release-v0.2.1-318A65)](https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.1)
+[![Release](https://img.shields.io/badge/release-v0.2.2-318A65)](https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.2)
 [![Build](https://github.com/BanVictor17/FrameSpool/actions/workflows/windows.yml/badge.svg?branch=main)](https://github.com/BanVictor17/FrameSpool/actions/workflows/windows.yml)
 [![Code license](https://img.shields.io/badge/code%20license-MIT-596575)](LICENSE)
 
@@ -14,7 +14,7 @@ It keeps the classic workflow and familiar artwork while using **installed Windo
 ![FrameSpool arranging photos in an eight-photo layout](docs/screenshots/layouts.png)
 
 <p align="center">
-  <a href="https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.1"><b>Download v0.2.1</b></a> ·
+  <a href="https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.2"><b>Download v0.2.2</b></a> ·
   <a href="#what-you-can-do">Features</a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="#printing">Printer setup</a> ·
@@ -33,7 +33,10 @@ It keeps the classic workflow and familiar artwork while using **installed Windo
 | **Color profiles** | Convert embedded RGB ICC profiles to sRGB before corrections. |
 | **Editable frames** | Create frames with rectangular/oval openings, artwork, text and lines. Import compatible legacy templates and share `.fspframe` packages. |
 | **Quick Print A/B** | Save layout/driver presets and create desktop shortcuts that accept dropped photos or folders. |
+| **GitHub updates** | Check the latest stable release, verify its checksum and update the portable EXE or installed MSI. |
 | **Printing and export** | Print through a Windows driver or export 300dpi PNG pages. Open the app without a connected printer. |
+
+The interface follows Windows display scaling, including monitor changes. Small screens can scroll the workspace.
 
 Thumbnails and page/correction previews render in the background, keeping resizing and positioning responsive. The app opens directly into photo selection.
 
@@ -47,13 +50,15 @@ Application code was written independently; recovered artwork/layout data is reu
 
 | Download | Best for |
 | --- | --- |
-| [**Portable EXE**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.1/FrameSpool-0.2.1-win-x64.exe) | One file: download and open. Move or rename it as needed. |
-| [**MSI installer**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.1/FrameSpool-0.2.1-win-x64.msi) | A regular installation with a Start menu shortcut, upgrades and Windows uninstall support. |
-| [**Portable ZIP**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.1/FrameSpool-0.2.1-win-x64-portable.zip) | The same EXE with documentation, notices and decoder source alongside it. |
+| [**Portable EXE**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.2/FrameSpool-0.2.2-win-x64.exe) | One file: download and open. Move or rename it as needed. |
+| [**MSI installer**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.2/FrameSpool-0.2.2-win-x64.msi) | A regular installation with a Start menu shortcut, upgrades and Windows uninstall support. |
+| [**Portable ZIP**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.2/FrameSpool-0.2.2-win-x64-portable.zip) | The same EXE with documentation, notices and decoder source alongside it. |
 
-The installer uses `%LOCALAPPDATA%\Programs\FrameSpool` for the current account. Preferences and photos are preserved when uninstalling. An optional desktop shortcut can be enabled with `msiexec /i FrameSpool-0.2.1-win-x64.msi INSTALLDESKTOPSHORTCUT=1`.
+The installer uses `%LOCALAPPDATA%\Programs\FrameSpool` for the current account. Preferences and photos are preserved when uninstalling. An optional desktop shortcut can be enabled with `msiexec /i FrameSpool-0.2.2-win-x64.msi INSTALLDESKTOPSHORTCUT=1`.
 
-Embedded license texts and decoder source are available in **Help > About > Licenses**. [SHA256 checksums](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.1/SHA256SUMS.txt) accompany each release.
+Embedded license texts and decoder source are available in **Help > About > Licenses**. [SHA256 checksums](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.2/SHA256SUMS.txt) accompany each release.
+
+**Updates:** choose **Help > Check for Updates** (also in About). Portable copies replace their current EXE, including renamed copies; installed copies run the new MSI and preserve their installation location. The app checks stable releases only, downloads on your request, verifies GitHub’s SHA256 digest, then restarts. Preferences and frames are kept; the current photo selection closes. Updating needs internet access and permission to write the app’s folder. Version 0.2.1 and earlier need this release downloaded manually to get the update button.
 
 No developer tools or network connection are needed to run it. It extracts bundled native runtime/decoder files into user-writable caches on first use; a writable temporary/profile directory is required. Releases are currently unsigned.
 
@@ -94,7 +99,7 @@ Preferences, presets, frames, errors and RAW caches live under `%LOCALAPPDATA%\F
 
 ## 🖨️ Printing
 
-Install the printer's Windows driver and choose its queue under **Printer Settings**. Media, quality, resolution and borderless controls use options reported by that driver and validate their combination before printing. **Properties** exposes additional options, including expansion and printer color management. Drivers without Print Schema controls use Properties. Saved device-specific settings are retained only for the same queue/compatible driver.
+Install the printer's Windows driver and choose its queue under **Printer Settings**. Media, quality, resolution and borderless controls use options reported by that driver and validate their combination before printing. **Properties** exposes additional options, including expansion and printer color management. Drivers without Print Schema controls use Properties. The driver can adjust incompatible combinations into supported settings; these successful adjustments are accepted. Printer Settings and the final print dialog save the complete accepted configuration immediately, even if a later print job fails. Subsequent jobs restore native settings instead of reapplying stale choices. Saved device-specific settings are retained only for the same queue/compatible driver.
 
 The L8050 path uses its normal Windows driver, without the old compatibility whitelist. Actual L8050 paper output has not been tested. Check paper size, orientation, borderless expansion, media, quality and color on hardware before relying on it for production.
 
@@ -106,13 +111,14 @@ Use **Microsoft Print to PDF** without hardware or **File > Export pages** for c
 .\setup-build-tools.ps1   # Downloads checksum-pinned .NET SDK and WiX into obj\tools
 .\build.ps1 -Installer
 .\verify.ps1
+.\verify-updater.ps1
 .\verify-installer.ps1
 .\package-release.ps1
 ```
 
 An installed compatible .NET 10 SDK can also be used. Runtime version is pinned to 10.0.12. The app is written to `dist\FrameSpool`; release assets are in `dist\release`. WiX 3.14.1 builds the per-user MSI. Native decoder binaries are checked in with complete unmodified upstream source and rebuilding instructions. SDK/WiX tools and research binaries are excluded from Git.
 
-Standalone verification copies only the EXE into an empty folder. Generated fixtures test layouts, rendering, crops, corrections, RAW, ICC conversion, frame packages, UI workflows and installed-driver settings without physical printing. MSI verification installs into an isolated test folder, runs app checks and uninstalls. CI also checks upgrade from a generated older MSI. Do not run MSI verification over an existing installed copy.
+Standalone verification copies only the EXE into an empty folder. Generated fixtures test layouts, rendering, crops, corrections, RAW, ICC conversion, frame packages, UI workflows and installed-driver settings without physical printing. Updater fixtures cover metadata validation, checksum failures, cancellation and portable rollback. DPI fixtures exercise 100%, 125%, 150% and 200% layouts. MSI verification installs into an isolated test folder, upgrades through the real updater helper, runs app checks and uninstalls. CI also checks upgrade from a generated older MSI. Do not run MSI verification over an existing installed copy.
 
 The optional `FrameSpool.exe --print-test <verification-output-folder>` command sends a generated fixture to Microsoft Print to PDF. Full reference equivalence and physical output are separate tasks.
 

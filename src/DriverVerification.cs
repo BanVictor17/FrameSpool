@@ -40,6 +40,15 @@ namespace FrameSpool
                 options.DriverMedia="{urn:removed-option}Unknown";bool rejected=false;
                 try{DriverCapabilities.Apply(document,options);}catch(InvalidOperationException){rejected=true;}
                 Check(checks,"Removed driver options are rejected before printing",rejected);
+                DriverSettings.CaptureAccepted(document,options);
+                Check(checks,"Accepted native settings clear obsolete Print Schema overrides",options.DriverOptionsPrinter==""&&options.DriverMedia==""&&options.DriverQuality==""&&options.DriverResolution=="");
+                var path=Path.Combine(directory,"accepted-print-settings.json");WorkflowStorage.Save(path,options);
+                var saved=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<PrintOptions>(File.ReadAllText(path));
+                using(var restored=new PrintDocument())
+                {
+                    restored.PrinterSettings.PrinterName=printer;PrinterProfile.Apply(restored,LayoutEngine.ForPaper("A4").First(),saved);
+                    Check(checks,"Persisted native settings retain the accepted resolution on the next job",DriverCapabilities.Read(restored).Selected("PageResolution")==applied.Selected("PageResolution")&&saved.DriverMode==options.DriverMode);
+                }
             }
         }
     }

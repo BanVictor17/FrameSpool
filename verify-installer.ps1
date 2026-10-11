@@ -1,6 +1,6 @@
 param([string]$MsiPath, [string]$PreviousMsiPath)
 $ErrorActionPreference='Stop'
-if(-not $MsiPath){$MsiPath=Join-Path $PSScriptRoot 'dist\release\FrameSpool-0.2.1-win-x64.msi'}
+if(-not $MsiPath){$MsiPath=Join-Path $PSScriptRoot 'dist\release\FrameSpool-0.2.2-win-x64.msi'}
 $MsiPath=[IO.Path]::GetFullPath($MsiPath)
 $taskResults=Join-Path $PSScriptRoot 'obj\verification-msi'
 $taskInstall=Join-Path $taskResults ('installed-'+[Guid]::NewGuid().ToString('N'))
@@ -24,6 +24,8 @@ function Invoke-Msi([string[]]$Arguments) {
 $taskProductCode=Read-MsiProperty $MsiPath 'ProductCode'
 $taskVersion=Read-MsiProperty $MsiPath 'ProductVersion'
 if((Read-ProductState $taskProductCode) -eq 5){throw 'This MSI is already installed. Verification will not replace an existing installation.'}
+$taskExisting=Get-ItemProperty 'HKCU:\Software\FrameSpool\Installer' -ErrorAction SilentlyContinue
+if($taskExisting.Application -eq 1 -and $taskExisting.InstallDirectory -and (Test-Path -LiteralPath (Join-Path $taskExisting.InstallDirectory 'FrameSpool.exe'))){throw 'An existing app installation is present. Verification will not replace it.'}
 $taskInstalledCode=$null;$taskPreviousCode=$null;$taskChecks=New-Object Collections.Generic.List[string]
 @{status='running';version=$taskVersion} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskResults 'installer-verification.json') -Encoding UTF8
 try {
@@ -35,7 +37,24 @@ try {
         $taskInstalledCode=$taskPreviousCode
     }
     Write-Output 'Installing/upgrading the release MSI.'
-    Invoke-Msi @('/i',('"'+$MsiPath+'"'),('APPDIR="'+$taskInstall+'"'),'INSTALLDESKTOPSHORTCUT=0','/qn','/norestart','/L*v',('"'+(Join-Path $taskResults 'install.log')+'"'))
+    if($taskPreviousCode){
+        $taskUpdateDirectory=Join-Path $taskResults ('update-'+[Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Force -Path $taskUpdateDirectory | Out-Null
+        $taskHelper=Join-Path $taskUpdateDirectory 'helper.exe'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'dist\FrameSpool\FrameSpool.exe') -Destination $taskHelper
+        $taskPayload=Join-Path $taskUpdateDirectory 'update.msi';Copy-Item -LiteralPath $MsiPath -Destination $taskPayload
+        $taskTarget=Join-Path $taskInstall 'FrameSpool.exe'
+        $taskParent=Start-Process -FilePath $taskTarget -ArgumentList @('--self-test',('"'+(Join-Path $taskUpdateDirectory 'previous-app-tests')+'"')) -WindowStyle Hidden -PassThru
+        $taskPlan=Join-Path $taskUpdateDirectory 'update.json'
+        @{Target=$taskTarget;Payload=$taskPayload;Hash=(Get-FileHash -LiteralPath $taskPayload -Algorithm SHA256).Hash;Version=$taskVersion;Installed=$true;ParentId=$taskParent.Id;ParentStarted=$taskParent.StartTime.ToUniversalTime().Ticks;Restart=$false;Quiet=$true} | ConvertTo-Json | Set-Content -LiteralPath $taskPlan -Encoding UTF8
+        Write-Output 'Upgrading through the real app update helper.'
+        $taskUpdater=Start-Process -FilePath $taskHelper -ArgumentList @('--apply-update',('"'+$taskPlan+'"')) -WindowStyle Hidden -PassThru
+        if(-not $taskUpdater.WaitForExit(180000)){throw 'MSI update helper timed out.'}
+        $taskUpdater.Refresh();if($taskUpdater.ExitCode -ne 0){throw ('MSI update helper failed: '+(Get-Content -LiteralPath (Join-Path $taskUpdateDirectory 'update.log') -Raw))}
+        $taskChecks.Add('Real updater helper upgrades the installed application')
+    }else{
+        Invoke-Msi @('/i',('"'+$MsiPath+'"'),('APPDIR="'+$taskInstall+'"'),'INSTALLDESKTOPSHORTCUT=0','/qn','/norestart','/L*v',('"'+(Join-Path $taskResults 'install.log')+'"'))
+    }
     $taskInstalledCode=$taskProductCode
     if((Read-ProductState $taskProductCode) -ne 5){throw 'The installed product was not registered.'};$taskChecks.Add('MSI product registration')
     if($taskPreviousCode){if((Read-ProductState $taskPreviousCode) -eq 5){throw 'Major upgrade did not remove the previous product.'};$taskChecks.Add('Major upgrade removes previous product')}
@@ -63,5 +82,5 @@ catch {
     throw
 }
 finally {
-    if($taskInstalledCode){Invoke-Msi @('/x',$taskInstalledCode,'/qn','/norestart','/L*v',('"'+(Join-Path $taskResults 'cleanup.log')+'"'))}
+    foreach($taskCleanupCode in @($taskInstalledCode,$taskProductCode,$taskPreviousCode) | Where-Object { $_ } | Select-Object -Unique){if((Read-ProductState $taskCleanupCode) -eq 5){Invoke-Msi @('/x',$taskCleanupCode,'/qn','/norestart','/L*v',('"'+(Join-Path $taskResults ('cleanup-'+$taskCleanupCode+'.log'))+'"'))}}
 }

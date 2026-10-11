@@ -36,7 +36,8 @@ namespace FrameSpool
                 foreach(var size in new[]{new Size(800,600),new Size(1040,720),new Size(1280,900),new Size(800,600)})
                 {
                     form.Size=size;form.PerformLayout();Application.DoEvents();
-                    check("Printing controls stay inside the window at "+size,form.body.Controls.Cast<Control>().All(c=>c.Left>=0&&c.Top>=0&&c.Right<=form.body.ClientSize.Width&&c.Bottom<=form.body.ClientSize.Height));
+                    var outside=form.body.Controls.Cast<Control>().Where(c=>c.Left<0||c.Top<0||c.Right>form.body.ClientSize.Width||c.Bottom>form.body.ClientSize.Height).ToList();
+                    checks.Add(new VerificationCheck{Name="Printing controls stay inside the window at "+size,Passed=outside.Count==0,Detail=outside.Count==0?"In-process Windows Forms verification":"Body "+form.body.ClientSize+": "+String.Join("; ",outside.Select(c=>c.GetType().Name+" "+c.Text+" "+c.Bounds))});
                     check("Print footer has no overlapping controls at "+size,form.totalLabel.Bottom<=form.dateInfo.Top);
                 }
                 for(int i=0;i<4;i++){form.ShowFrameMenu();form.frameMenu.Close();Application.DoEvents();}
@@ -71,6 +72,23 @@ namespace FrameSpool
                 SaveSurface(form,System.IO.Path.Combine(directory,"select-photos-return.png"));
                 check("Repeated screen changes do not duplicate controls",form.body.Controls.Count==browserControls&&!form.printingScreen);
                 check("Returning from printing retains selected copies",form.Selected.Count==1&&form.next.Enabled);
+                foreach(int dpi in new[]{120,144,192,96})
+                {
+                    form.ApplyDpi(dpi);form.ClientSize=new Size(form.Pixels(1024),form.Pixels(720));form.PerformLayout();
+                    check("Browser fonts and sidebar scale at "+dpi+" DPI",Math.Abs(form.folders.Font.Size-12*dpi/96f)<.1&&form.folders.Width==form.Pixels(160));
+                    form.BuildPrinting();form.BuildMenus();Application.DoEvents();
+                    check("Rebuilt printing controls scale at "+dpi+" DPI",form.layouts.Width==form.Pixels(200)&&form.layouts.ItemHeight==form.Pixels(55)&&Math.Abs(form.printerInfo.Font.Size-12*dpi/96f)<.1);
+                    var display=form.body.DisplayRectangle;
+                    var outsideDpi=form.body.Controls.Cast<Control>().Where(c=>c.Left<display.Left||c.Top<display.Top||c.Right>display.Right||c.Bottom>display.Bottom).ToList();
+                    checks.Add(new VerificationCheck{Name="Printing controls fit the visible or scrollable workspace at "+dpi+" DPI",Passed=outsideDpi.Count==0,Detail=outsideDpi.Count==0?"In-process Windows Forms verification":"Display "+display+": "+String.Join("; ",outsideDpi.Select(c=>c.GetType().Name+" "+c.Text+" "+c.Bounds))});
+                    SaveSurface(form,System.IO.Path.Combine(directory,"print-settings-dpi-"+dpi+".png"));
+                    form.BuildBrowser();form.BuildMenus();form.ShowFolderPhotos(new List<PhotoItem>{photo});
+                }
+                form.BuildPrinting();form.MinimumSize=Size.Empty;form.ClientSize=new Size(640,420);Application.DoEvents();
+                check("Small laptop workspaces expose scrolling instead of shrinking controls",form.body.AutoScroll&&form.body.AutoScrollMinSize.Width>=784&&form.body.AutoScrollMinSize.Height>=521&&form.printerInfo.Font.Size==12);
+                form.body.AutoScrollPosition=new Point(10000,10000);Application.DoEvents();
+                var printButton=form.body.Controls.OfType<SkinButton>().First(c=>c.Text=="Print");
+                check("Workspace scrolling reaches the Print button",printButton.Bottom<=form.body.ClientSize.Height&&printButton.Right<=form.body.ClientSize.Width);
             }
             var settings=new PrinterSettings();
 
