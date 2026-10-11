@@ -5,8 +5,8 @@ using System.Linq;
 
 namespace FrameSpool
 {
-    // Uses the installed Windows driver's public capabilities. PICSDK's
-    // private paper-media/edge-expansion fields are not available through GDI.
+    // Uses Windows public paper settings, validated Print Schema selections and
+    // the full driver DEVMODE for additional settings chosen in Properties.
     public static class PrinterProfile
     {
         public static void Apply(PrintDocument document, PhotoLayout layout, PrintOptions options)
@@ -24,7 +24,7 @@ namespace FrameSpool
                 if(source!=null)page.PaperSource=source;
                 var resolutions=document.PrinterSettings.PrinterResolutions.Cast<PrinterResolution>().ToList();
                 var resolution=resolutions.FirstOrDefault(r=>String.Equals(r.X>0&&r.Y>0?r.X+" x "+r.Y+" dpi":r.Kind.ToString(),options.Mode,StringComparison.OrdinalIgnoreCase));
-                if(resolution==null && options.Mode!="Printer Properties")
+                if(resolution==null && new[]{"Draft","Text","Text & Image","Photo","Best Photo"}.Contains(options.Mode))
                 {
                     PrinterResolutionKind requested=options.Mode=="Draft"?PrinterResolutionKind.Draft:options.Mode=="Text"?PrinterResolutionKind.Low:options.Mode=="Text & Image"?PrinterResolutionKind.Medium:PrinterResolutionKind.High;
                     resolution=resolutions.FirstOrDefault(r=>r.Kind==requested);
@@ -33,6 +33,7 @@ namespace FrameSpool
             }
             else page.PaperSize=new PaperSize(options.Paper,width,height);
             page.Margins=new Margins(0,0,0,0);
+            if(document.PrinterSettings.IsValid)DriverCapabilities.Apply(document,options);
         }
         public static void EnsurePageFormat(PrintDocument document,PhotoLayout layout,PrintOptions options)
         {

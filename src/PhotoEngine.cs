@@ -27,6 +27,10 @@ namespace FrameSpool
         public int Slimming;
         public int FaceDefinition;
         public int SkinRadiance;
+        // Thirteen RAW exposure choices: -3 EV to +3 EV in half-stop increments.
+        public int RawExposureSteps;
+        public string RawWhiteBalance = "As Shot";
+        public string SlimmingDirection = "Vertical";
 
         public PhotoAdjustments Clone()
         {
@@ -40,6 +44,9 @@ namespace FrameSpool
             Mode = "PhotoEnhance";
             Scene = "Standard";
             SceneLevel = Brightness = Slimming = FaceDefinition = SkinRadiance = 0;
+            RawExposureSteps = 0;
+            RawWhiteBalance = "As Shot";
+            SlimmingDirection = "Vertical";
             Vivid = Monochrome = DigitalCorrection = SmoothSkin = AutoRedEye = false;
             if (ManualEyePoints == null) ManualEyePoints = new List<PointF>();
             else ManualEyePoints.Clear();
@@ -52,7 +59,8 @@ namespace FrameSpool
                 return !String.Equals(Mode, "None", StringComparison.OrdinalIgnoreCase) ||
                     Brightness != 0 || Vivid || Monochrome || DigitalCorrection || AutoRedEye ||
                     (ManualEyePoints != null && ManualEyePoints.Count != 0) ||
-                    Slimming != 0 || FaceDefinition != 0 || SkinRadiance != 0;
+                    Slimming != 0 || FaceDefinition != 0 || SkinRadiance != 0 ||
+                    RawExposureSteps != 0 || !String.Equals(RawWhiteBalance, "As Shot", StringComparison.OrdinalIgnoreCase);
             }
         }
     }
@@ -73,6 +81,7 @@ namespace FrameSpool
         public int Height { get; private set; }
         public long FileSize { get; private set; }
         public Dictionary<string, string> Metadata { get; private set; }
+        public bool IsRaw { get { return RawDecoder.IsRawPath(FilePath); } }
         public int Rotation
         {
             get { return rotation; }
@@ -120,15 +129,23 @@ namespace FrameSpool
             CaptureDate = info.LastWriteTime;
             Metadata = new Dictionary<string, string>();
             Adjustments = new PhotoAdjustments();
-            using (FileStream stream = File.Open(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (Image image = Image.FromStream(stream, true, true))
+            if (IsRaw)
             {
-                int orientation = PhotoEngine.GetExifOrientation(image);
-                Width = orientation >= 5 && orientation <= 8 ? image.Height : image.Width;
-                Height = orientation >= 5 && orientation <= 8 ? image.Width : image.Height;
-                CaptureDate = PhotoEngine.GetCaptureDate(image, CaptureDate);
-                PhotoEngine.ReadMetadata(image, Metadata);
+                RawPhotoInfo raw = RawDecoder.Identify(FilePath);
+                Width = raw.Width;
+                Height = raw.Height;
+                if (raw.CaptureDate.HasValue) CaptureDate = raw.CaptureDate.Value;
+                foreach (var item in raw.Metadata) Metadata[item.Key] = item.Value;
             }
+            else using (FileStream stream = File.Open(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (Image image = Image.FromStream(stream, true, true))
+                {
+                    int orientation = PhotoEngine.GetExifOrientation(image);
+                    Width = orientation >= 5 && orientation <= 8 ? image.Height : image.Width;
+                    Height = orientation >= 5 && orientation <= 8 ? image.Width : image.Height;
+                    CaptureDate = PhotoEngine.GetCaptureDate(image, CaptureDate);
+                    PhotoEngine.ReadMetadata(image, Metadata);
+                }
             string validation = PhotoEngine.ValidateDimensions(Width, Height, 60);
             if (validation != null) throw new ArgumentException(validation, "filePath");
         }
@@ -177,7 +194,27 @@ namespace FrameSpool
         public const long MaximumRedEyePixels = 20000000;
         public const string CorrectionFidelityNote =
             "PhotoEnhance, scene, red-eye, skin and face adjustments use independent approximate algorithms. " +
-            "PRINT Image Matching metadata and proprietary RAW development are not interpreted.";
+            "Camera RAW files are developed by LibRaw into sRGB. Embedded bitmap ICC profiles use Windows color management. " +
+            "PRINT Image Matching metadata is not interpreted.";
+
+        public static readonly string[] SupportedExtensions = new string[] {
+            ".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".bmp", ".tif", ".tiff", ".gif",
+            ".3fr", ".arw", ".bay", ".cap", ".cr2", ".cr3", ".crw", ".dcr", ".dcs", ".dng",
+            ".erf", ".fff", ".iiq", ".k25", ".kdc", ".mdc", ".mef", ".mos", ".mrw",
+            ".nef", ".nrw", ".obm", ".orf", ".pef", ".ptx", ".pxn", ".raf", ".raw",
+            ".rw2", ".rwl", ".rwz", ".sr2", ".srf", ".srw", ".sti", ".x3f"
+        };
+
+        // Extension recognition is deliberately cheap; PhotoItem validates actual decoding.
+        public static bool CanDecode(string path)
+        {
+            if (String.IsNullOrWhiteSpace(path)) return false;
+            string extension;
+            try { extension = Path.GetExtension(path); }
+            catch (ArgumentException) { return false; }
+            return Array.Exists(SupportedExtensions, delegate(string value) {
+                return String.Equals(extension, value, StringComparison.OrdinalIgnoreCase); });
+        }
 
         public static string ValidateDimensions(int width, int height, int minimum = 60)
         {
@@ -197,9 +234,11 @@ namespace FrameSpool
 
         public static Bitmap LoadImage(string filePath)
         {
+            if (RawDecoder.IsRawPath(filePath)) return RawDecoder.Load(filePath, null);
             using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (Image source = Image.FromStream(stream, true, true))
+            using (Image source = Image.FromStream(stream, false, true))
             {
+                byte[] colorProfile = WindowsColorManagement.EmbeddedProfile(source);
                 ApplyExifOrientation(source, GetExifOrientation(source));
                 Bitmap bitmap = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
                 try
@@ -209,6 +248,7 @@ namespace FrameSpool
                         graphics.CompositingMode = CompositingMode.SourceCopy;
                         graphics.DrawImage(source, new Rectangle(0, 0, bitmap.Width, bitmap.Height));
                     }
+                    WindowsColorManagement.ConvertToSrgb(bitmap, colorProfile);
                     return bitmap;
                 }
                 catch { bitmap.Dispose(); throw; }
@@ -219,8 +259,9 @@ namespace FrameSpool
         {
             if (photo == null) throw new ArgumentNullException("photo");
             if (width < 1 || height < 1) throw new ArgumentOutOfRangeException("width");
-            using (Bitmap source = RenderImage(photo, false))
+            using (Bitmap source = photo.IsRaw ? RawDecoder.LoadPreview(photo.FilePath) : RenderImage(photo, false))
             {
+                if (photo.IsRaw && photo.Rotation != 0) source.RotateFlip((RotateFlipType)photo.Rotation);
                 Bitmap thumbnail = new Bitmap(width, height, PixelFormat.Format32bppArgb);
                 try
                 {
@@ -238,14 +279,60 @@ namespace FrameSpool
             }
         }
 
+        public static Bitmap CreateHistogram(PhotoItem photo, int width, int height)
+        {
+            if (photo == null) throw new ArgumentNullException("photo");
+            if (width < 16 || height < 16) throw new ArgumentOutOfRangeException("width");
+            int[][] bins = { new int[256], new int[256], new int[256] };
+            using (Bitmap image = RenderImage(photo, true))
+            {
+                int step = Math.Max(1, (int)Math.Sqrt((long)image.Width * image.Height / 65536.0));
+                BitmapData bits = image.LockBits(new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                try
+                {
+                    byte[] row = new byte[checked(image.Width * 4)];
+                    for (int y = 0; y < image.Height; y += step)
+                    {
+                        Marshal.Copy(IntPtr.Add(bits.Scan0, y * bits.Stride), row, 0, row.Length);
+                        for (int x = 0; x < image.Width; x += step)
+                        {
+                            int offset = x * 4;
+                            if (row[offset + 3] == 0) continue;
+                            bins[0][row[offset + 2]]++;
+                            bins[1][row[offset + 1]]++;
+                            bins[2][row[offset]]++;
+                        }
+                    }
+                }
+                finally { image.UnlockBits(bits); }
+            }
+            int maximum = 1;
+            foreach (var channel in bins) foreach (int value in channel) maximum = Math.Max(maximum, value);
+            var histogram = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+            using (var graphics = Graphics.FromImage(histogram))
+            {
+                graphics.Clear(Color.FromArgb(24, 26, 30));
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Color[] colors = { Color.FromArgb(210, 255, 80, 80), Color.FromArgb(210, 90, 220, 110), Color.FromArgb(210, 90, 145, 255) };
+                for (int channel = 0; channel < bins.Length; channel++)
+                {
+                    var points = new PointF[256];
+                    for (int value = 0; value < 256; value++) points[value] = new PointF(2 + value * (width - 5f) / 255f,
+                        height - 3 - bins[channel][value] * (height - 6f) / maximum);
+                    using (var pen = new Pen(colors[channel], 1)) graphics.DrawLines(pen, points);
+                }
+            }
+            return histogram;
+        }
+
         // The caller owns the returned Bitmap and must dispose it.
         public static Bitmap RenderImage(PhotoItem photo, bool corrected)
         {
             if (photo == null) throw new ArgumentNullException("photo");
-            Bitmap image = LoadImage(photo.FilePath);
+            PhotoAdjustments adjustments = photo.Adjustments ?? new PhotoAdjustments();
+            Bitmap image = photo.IsRaw ? RawDecoder.Load(photo.FilePath, corrected ? adjustments : null) : LoadImage(photo.FilePath);
             try
             {
-                PhotoAdjustments adjustments = photo.Adjustments ?? new PhotoAdjustments();
                 if (corrected && adjustments.HasCorrections)
                 {
                     if (CanCorrectRedEye(photo) && (adjustments.AutoRedEye ||
@@ -260,7 +347,10 @@ namespace FrameSpool
                 if (photo.Rotation != 0) image.RotateFlip((RotateFlipType)photo.Rotation);
                 if (corrected && adjustments.Slimming > 0)
                 {
+                    bool horizontal = String.Equals(adjustments.SlimmingDirection, "Horizontal", StringComparison.OrdinalIgnoreCase);
+                    if (horizontal) image.RotateFlip(RotateFlipType.Rotate90FlipNone);
                     Bitmap slimmed = ApplySlimming(image, Math.Max(0, Math.Min(3, adjustments.Slimming)));
+                    if (horizontal) slimmed.RotateFlip(RotateFlipType.Rotate270FlipNone);
                     image.Dispose();
                     image = slimmed;
                 }
@@ -359,6 +449,12 @@ namespace FrameSpool
             string colorSpace = GetUnsignedProperty(image, 0xA001);
             output["Exif/DCF Color Space"] = colorSpace == "1" ? "Standard (sRGB)" : colorSpace == "65535" ? "DCF Option" : "-";
             output["Mono. Info"] = "-";
+            try
+            {
+                byte[] profile = image.GetPropertyItem(0x8773).Value;
+                output["Color Management"] = profile.Length >= 128 ? "Embedded ICC profile (Windows color management)" : "sRGB assumed";
+            }
+            catch (ArgumentException) { output["Color Management"] = "sRGB assumed when no embedded profile is present"; }
         }
 
         private static string GetAsciiProperty(Image image, int id)
@@ -471,7 +567,8 @@ namespace FrameSpool
         private static void ApplyTone(Bitmap image, PhotoAdjustments adjustments)
         {
             // Independent global tone approximation: no proprietary LUT/profile is used.
-            bool enhance = String.Equals(adjustments.Mode, "PhotoEnhance", StringComparison.OrdinalIgnoreCase);
+            bool enhance = String.Equals(adjustments.Mode, "PhotoEnhance", StringComparison.OrdinalIgnoreCase) &&
+                !String.Equals(adjustments.Scene, "No Adjustment", StringComparison.OrdinalIgnoreCase);
             double contrast = enhance ? 1.06 : 1.0;
             double saturation = enhance ? 1.05 : 1.0;
             double exposure = Math.Pow(2.0, Clamp(adjustments.Brightness, -100, 100) / 100.0);
@@ -493,7 +590,7 @@ namespace FrameSpool
             for (int i = 0; i < pixels.Length; i += 4)
             {
                 double b = pixels[i], g = pixels[i + 1], r = pixels[i + 2];
-                double gray = .2126 * r + .7152 * g + .0722 * b;
+                double gray = FixedPointColorMath.Luminance((byte)r, (byte)g, (byte)b);
                 if (adjustments.Monochrome) r = g = b = gray;
                 else
                 { r = gray + (r - gray) * saturation; g = gray + (g - gray) * saturation; b = gray + (b - gray) * saturation; }

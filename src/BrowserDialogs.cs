@@ -17,6 +17,11 @@ namespace FrameSpool
     {
         public bool OneClickSelection = true;
         public bool DoNotShowSplash;
+        public bool ShowToolTips = true;
+        public bool ShowAlerts = true;
+        public int ThumbnailSize = 130;
+        public string Sort = "File Name";
+        public bool SortDescending;
         public string QuickPrintSlot = "A";
     }
 
@@ -25,6 +30,7 @@ namespace FrameSpool
         public PrintOptions Settings;
         public string LayoutId;
         public bool Confirm = true;
+        public bool DesktopShortcut;
     }
 
     public sealed class QuickPrintStore
@@ -37,6 +43,10 @@ namespace FrameSpool
     {
         bool browserOneClickSelection = true;
         bool browserDoNotShowSplash;
+        bool browserShowToolTips = true, browserShowAlerts = true;
+        int browserThumbnailSize = 130;
+        string browserSort = "File Name";
+        bool browserSortDescending;
         string browserQuickPrintSlot = "A";
 
         void LoadBrowserPreferences()
@@ -48,6 +58,10 @@ namespace FrameSpool
                 if (saved == null) return;
                 browserOneClickSelection = saved.OneClickSelection;
                 browserDoNotShowSplash = saved.DoNotShowSplash;
+                browserShowToolTips = saved.ShowToolTips; browserShowAlerts = saved.ShowAlerts;
+                browserThumbnailSize = new[]{80,130,170,220}.Contains(saved.ThumbnailSize) ? saved.ThumbnailSize : 130;
+                browserSort = new[]{"File Name","Photo Date","File Modification Date"}.Contains(saved.Sort) ? saved.Sort : "File Name";
+                browserSortDescending = saved.SortDescending;
                 browserQuickPrintSlot = saved.QuickPrintSlot == "B" ? "B" : "A";
             }
             catch { }
@@ -61,8 +75,10 @@ namespace FrameSpool
                 BrowserPreferences saved = new BrowserPreferences {
                     OneClickSelection = browserOneClickSelection,
                     DoNotShowSplash = browserDoNotShowSplash,
+                    ShowToolTips = browserShowToolTips, ShowAlerts = browserShowAlerts,
+                    ThumbnailSize = browserThumbnailSize, Sort=browserSort, SortDescending=browserSortDescending,
                     QuickPrintSlot = browserQuickPrintSlot };
-                File.WriteAllText(settingsFile + ".browser", new JavaScriptSerializer().Serialize(saved));
+                WorkflowStorage.Save(settingsFile + ".browser", saved);
             }
             catch (Exception ex)
             {
@@ -259,7 +275,7 @@ namespace FrameSpool
                     SearchCriteria criteria;
                     try
                     {
-                        criteria = new SearchCriteria { Root = root, Name = name.Text.Trim(), Minimum = Options.MinimumImageSize,
+                        criteria = new SearchCriteria { Root = root, Name = name.Text.Trim(), Minimum = loadMinimumImageSize,
                             ModifiedFrom = SearchDate(modifiedFrom.Text, "", false), ModifiedTo = SearchDate(modifiedTo.Text, "", true),
                             CaptureFrom = SearchDate(captureFrom.Text, timeFrom.Text, false), CaptureTo = SearchDate(captureTo.Text, timeTo.Text, true) };
                         if (criteria.Name.Length == 0 && !criteria.ModifiedFrom.HasValue && !criteria.ModifiedTo.HasValue && !criteria.CaptureFrom.HasValue && !criteria.CaptureTo.HasValue)
@@ -308,7 +324,6 @@ namespace FrameSpool
             SearchOutcome outcome = new SearchOutcome();
             Stack<string> pending = new Stack<string>(); pending.Push(criteria.Root);
             HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            string[] extensions = new string[] { ".jpg", ".jpeg", ".jfif", ".png", ".bmp", ".tif", ".tiff", ".gif" };
             int directories = 0;
             while (pending.Count > 0 && !token.IsCancellationRequested)
             {
@@ -323,7 +338,7 @@ namespace FrameSpool
                         if (token.IsCancellationRequested) break;
                         if (++outcome.Scanned > 50000) { outcome.Limited = true; break; }
                         if (outcome.Scanned % 25 == 0) progress.Report("Searching... " + outcome.Scanned + " files, " + outcome.Photos.Count + " matches\r\n" + Path.GetFileName(path));
-                        if (!extensions.Contains(Path.GetExtension(path).ToLowerInvariant())) continue;
+                        if (!PhotoEngine.CanDecode(path)) continue;
                         if (criteria.Name.Length > 0 && Path.GetFileName(path).IndexOf(criteria.Name, StringComparison.OrdinalIgnoreCase) < 0) continue;
                         try
                         {
@@ -368,12 +383,7 @@ namespace FrameSpool
                     Button ok = Ui.Button(dialog, "OK", 169, 132, 85, 21, delegate {
                         browserOneClickSelection = oneClick.Checked;
                         browserDoNotShowSplash = splash.Checked;
-                        // The parent TileView consumes OneClickSelection where supported.
-                        if (folderPhotos != null && !folderPhotos.IsDisposed)
-                        {
-                            System.Reflection.FieldInfo field = folderPhotos.GetType().GetField("OneClickSelection");
-                            if (field != null) field.SetValue(folderPhotos, browserOneClickSelection);
-                        }
+                        if (folderPhotos != null && !folderPhotos.IsDisposed)folderPhotos.OneClickSelection=browserOneClickSelection;
                         PersistBrowserPreferences(); dialog.Close();
                     });
                     Button cancel = Ui.Button(dialog, "Cancel", 262, 132, 85, 21, delegate { dialog.Close(); });
@@ -404,7 +414,7 @@ namespace FrameSpool
                 Ui.Label(restart, "pixels", 100, 58, 150, 18);
                 Ui.Label(restart, "Specify the minimum loadable image dimension as\r\n60 to 600 pixels portrait or landscape.", 38, 83, 360, 44);
                 Ui.Label(restart, "RAW Development", 19, 132, 360, 18);
-                Ui.Label(restart, "Camera RAW images require an installed decoder or conversion to TIFF/JPEG.", 38, 155, 425, 30);
+                Ui.Label(restart, "Camera RAW decoding is included. Exposure and white balance are in Image Correct > RAW Development.", 38, 155, 425, 30);
                 Button ok = Ui.Button(dialog, "OK", 335, 379, 80, 21, delegate {
                     Options.InfoFileName = file.Checked; Options.DateFormat = formats[Math.Max(0, format.SelectedIndex)];
                     Options.ShowTime = time.Checked; Options.ShowSeconds = seconds.Checked;
@@ -434,7 +444,7 @@ namespace FrameSpool
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(settingsFile));
-                File.WriteAllText(settingsFile + ".quick", new JavaScriptSerializer().Serialize(store));
+                WorkflowStorage.Save(settingsFile + ".quick", store);
                 if (quickPrint != null && !quickPrint.IsDisposed) quickPrint.Visible = store.A != null || store.B != null;
                 return true;
             }
@@ -465,25 +475,28 @@ namespace FrameSpool
                 TextBox registered = BrowserText(dialog, 15, 88, 255); registered.Multiline = true; registered.ReadOnly = true; registered.Height = 167; registered.ScrollBars = ScrollBars.Vertical;
                 TextBox proposed = BrowserText(dialog, 280, 88, 255); proposed.Multiline = true; proposed.ReadOnly = true; proposed.Height = 167; proposed.ScrollBars = ScrollBars.Vertical;
                 proposed.Text = PrintSettingsSummary(Options, CurrentLayout == null ? null : CurrentLayout.Id);
-                CheckBox confirm = Ui.Check(dialog, "Display a confirmation message before printing.", 15, 280, 520, true, null);
+                CheckBox shortcut = Ui.Check(dialog, "Create a shortcut icon on the desktop.", 15, 275, 520, false, null);
+                CheckBox confirm = Ui.Check(dialog, "Display a confirmation message before printing.", 15, 305, 520, true, null);
                 Action update = delegate {
                     QuickPrintSet set = b.Checked ? store.B : store.A;
                     a.Text = "A " + (store.A == null ? "Unregistered" : "Registered");
                     b.Text = "B " + (store.B == null ? "Unregistered" : "Registered");
                     registered.Text = set == null ? "Unregistered" : PrintSettingsSummary(set.Settings, set.LayoutId);
                     confirm.Checked = set == null || set.Confirm;
+                    shortcut.Checked = set != null && set.DesktopShortcut;
                 };
                 a.CheckedChanged += delegate { if (a.Checked) update(); }; b.CheckedChanged += delegate { if (b.Checked) update(); };
                 Ui.Button(dialog, "Clear Settings", 211, 365, 100, 21, delegate {
+                    string slot=b.Checked?"B":"A";
                     if (b.Checked) store.B = null; else store.A = null;
-                    if (SaveQuickPrint(store)) update();
+                    if (SaveQuickPrint(store)){try{QuickPrintShortcut.Remove(slot);}catch(Exception error){MessageBox.Show(dialog,error.Message,"Quick Print Shortcut");}update();}
                 });
                 Ui.Button(dialog, "Save Settings", 326, 365, 100, 21, delegate {
                     if (CurrentLayout == null) return;
                     PrintOptions snapshot = new PrintOptions(); CopyOptions(Options, snapshot);
-                    QuickPrintSet set = new QuickPrintSet { Settings = snapshot, LayoutId = CurrentLayout.Id, Confirm = confirm.Checked };
+                    QuickPrintSet set = new QuickPrintSet { Settings = snapshot, LayoutId = CurrentLayout.Id, Confirm = confirm.Checked, DesktopShortcut=shortcut.Checked };
                     if (b.Checked) store.B = set; else store.A = set;
-                    if (SaveQuickPrint(store)) { browserQuickPrintSlot = b.Checked ? "B" : "A"; PersistBrowserPreferences(); update(); }
+                    if (SaveQuickPrint(store)) { browserQuickPrintSlot = b.Checked ? "B" : "A";try{if(shortcut.Checked)QuickPrintShortcut.Create(QuickPrintShortcut.DesktopPath(browserQuickPrintSlot),browserQuickPrintSlot);else QuickPrintShortcut.Remove(browserQuickPrintSlot);}catch(Exception error){set.DesktopShortcut=false;SaveQuickPrint(store);MessageBox.Show(dialog,"The settings were saved, but the desktop shortcut could not be updated.\r\n"+error.Message,"Quick Print Shortcut");} PersistBrowserPreferences(); update(); }
                 });
                 Button close = Ui.Button(dialog, "Close", 441, 365, 100, 21, delegate { dialog.Close(); });
                 Ui.Button(dialog, "Help", 441, 15, 100, 21, delegate { ShowHelp("Register Quick Print"); });
@@ -492,11 +505,13 @@ namespace FrameSpool
         }
 
         void RunQuickPrint()
+        { RunQuickPrint(null); }
+        void RunQuickPrint(string requestedSlot)
         {
             if (Selected.Count == 0) return;
             QuickPrintStore store = ReadQuickPrint();
-            string slot = browserQuickPrintSlot;
-            if (store.A != null && store.B != null)
+            string slot = requestedSlot ?? browserQuickPrintSlot;
+            if (requestedSlot==null&&store.A != null && store.B != null)
             {
                 using (Form chooser = Ui.Dialog("Quick Print", 300, 180))
                 {
@@ -510,16 +525,16 @@ namespace FrameSpool
                     if (chooser.ShowDialog(this) != DialogResult.OK) return;
                 }
             }
-            else slot = store.A != null ? "A" : "B";
+            else if(requestedSlot==null)slot = store.A != null ? "A" : "B";
             QuickPrintSet set = slot == "B" ? store.B : store.A;
             if (set == null || set.Settings == null) { MessageBox.Show(this, "No Quick Print settings are registered.", "Quick Print"); return; }
             PhotoLayout layout = FrameSpool.LayoutEngine.Catalog.FirstOrDefault(l => l.Id == set.LayoutId && l.Paper == set.Settings.Paper);
             if (layout == null || !PrinterSettings.InstalledPrinters.Cast<string>().Contains(set.Settings.Printer, StringComparer.OrdinalIgnoreCase))
             { MessageBox.Show(this, "Unable to find the printer driver or the layout registered in Quick Print. Please register the Quick Print settings again.", "Quick Print"); return; }
             if (set.Confirm && MessageBox.Show(this, "Prints selected photos with the following settings. Do you want to continue?\r\n\r\n" + PrintSettingsSummary(set.Settings, set.LayoutId), "Confirm Quick Print", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
-            CopyOptions(set.Settings, Options); CurrentLayout = layout;
+            int minimum=Options.MinimumImageSize;CopyOptions(set.Settings, Options);Options.MinimumImageSize=minimum; CurrentLayout = layout;
             browserQuickPrintSlot = slot; PersistBrowserPreferences();
-            BuildPrinting(); BuildMenus(); Print();
+            manualMode=false;pageCopyCounts.Clear();BuildPrinting(); BuildMenus(); PrintWithDriver(true,false);
         }
     }
 
@@ -531,6 +546,7 @@ namespace FrameSpool
         float zoom = 1f;
         public event Action ViewChanged;
         public BrowserPhotoView() { DoubleBuffered = true; BackColor = Color.White; BorderStyle = BorderStyle.Fixed3D; }
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public bool FitToWindow
         {
             get { return fit; }

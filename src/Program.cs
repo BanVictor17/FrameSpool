@@ -10,13 +10,18 @@ namespace FrameSpool
         [STAThread]
         static int Main(string[] args)
         {
+            Application.SetHighDpiMode(HighDpiMode.SystemAware);
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
             Application.ThreadException+=delegate(object s,System.Threading.ThreadExceptionEventArgs e){ReportError(e.Exception);};
             try
             {
                 if(args.Length>0&&args[0]=="--self-test")return Verification.Run(args.Length>1?args[1]:Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"verification"));
                 if(args.Length>0&&args[0]=="--print-test")return Verification.PrintPdfTest(args.Length>1?args[1]:Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"verification"));
-                Application.Run(new MainForm(args.Where(File.Exists).ToArray()));return 0;
+                if(args.Length==3&&args[0]=="--capture-screenshots")return MainForm.CaptureScreenshots(Path.GetFullPath(args[1]),Path.GetFullPath(args[2]));
+                var launch=QuickPrintLaunch.Parse(args);
+                var form=new MainForm(launch.Files);
+                form.Shown+=delegate{if(launch.Slot!=null)form.StartQuickPrint(launch.Slot);};
+                Application.Run(form);return 0;
             }
             catch(Exception ex){ReportError(ex);return 1;}
         }

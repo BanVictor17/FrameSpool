@@ -51,9 +51,11 @@ namespace FrameSpool
                 var autoRed=Ui.Check(right,"Fix Red-Eye (Auto)",23,323,216,false,null);
                 var manual=Ui.Check(f,"Fix Red-Eye (Manual)",555,435,225,false,null);
                 Action render=null;Action sync=null;Action store=null;
+                var rawButton=Ui.Button(f,"RAW Development...",12,464,153,21,delegate{ShowRawDevelopment(photo);render();});rawButton.Enabled=photo.IsRaw;
+                Ui.Button(f,"Histogram...",173,464,153,21,delegate{ShowHistogram(photo);});
                 render=delegate{try{var view=photo.Clone();view.Rotation=photo.Rotation+viewingRotation;canvas.SetImage(PhotoEngine.RenderImage(view,true));file.Text="File:       "+photo.FileName;path.Text="Location: "+Path.GetDirectoryName(photo.FilePath);}catch(Exception ex){MessageBox.Show(f,ex.Message,"Image Correct");}};
                 store=delegate{if(loading)return;var a=photo.Adjustments;a.Mode=none.Checked?"None":pim.Checked?"PIM":"PhotoEnhance";a.Scene=scene.Text;a.SceneLevel=level.Value;a.Brightness=brightness.Value;a.Monochrome=mono.Checked;a.Vivid=vivid.Checked;a.DigitalCorrection=noise.Checked;a.SmoothSkin=smooth.Checked;a.AutoRedEye=autoRed.Checked;mono.Enabled=scene.Text!="Night Scene";if(!mono.Enabled)a.Monochrome=false;scene.Enabled=level.Enabled=fix.Checked;standard.Enabled=smooth.Enabled=noise.Checked;render();};
-                sync=delegate{loading=true;var a=photo.Adjustments;fix.Checked=a.Mode!="None"&&a.Mode!="PIM";none.Checked=a.Mode=="None";pim.Checked=a.Mode=="PIM";scene.SelectedItem=a.Scene;level.Value=Math.Max(-100,Math.Min(100,a.SceneLevel));brightness.Value=Math.Max(-100,Math.Min(100,a.Brightness));mono.Checked=a.Monochrome;vivid.Checked=a.Vivid;noise.Checked=a.DigitalCorrection;smooth.Checked=a.SmoothSkin;standard.Checked=!a.SmoothSkin;standard.Enabled=smooth.Enabled=noise.Checked;scene.Enabled=level.Enabled=fix.Checked;autoRed.Checked=a.AutoRedEye;comments.Text=photo.Comment;autoRed.Enabled=PhotoEngine.CanCorrectRedEye(photo);loading=false;render();};
+                sync=delegate{loading=true;rawButton.Enabled=photo.IsRaw;var a=photo.Adjustments;fix.Checked=a.Mode!="None"&&a.Mode!="PIM";none.Checked=a.Mode=="None";pim.Checked=a.Mode=="PIM";scene.SelectedItem=a.Scene;level.Value=Math.Max(-100,Math.Min(100,a.SceneLevel));brightness.Value=Math.Max(-100,Math.Min(100,a.Brightness));mono.Checked=a.Monochrome;vivid.Checked=a.Vivid;noise.Checked=a.DigitalCorrection;smooth.Checked=a.SmoothSkin;standard.Checked=!a.SmoothSkin;standard.Enabled=smooth.Enabled=noise.Checked;scene.Enabled=level.Enabled=fix.Checked;autoRed.Checked=a.AutoRedEye;comments.Text=photo.Comment;autoRed.Enabled=PhotoEngine.CanCorrectRedEye(photo);loading=false;render();};
                 fix.CheckedChanged+=delegate{store();};none.CheckedChanged+=delegate{store();};pim.CheckedChanged+=delegate{store();};scene.SelectedIndexChanged+=delegate{store();};level.ValueChanged+=delegate{store();};brightness.ValueChanged+=delegate{store();};mono.CheckedChanged+=delegate{store();};vivid.CheckedChanged+=delegate{store();};noise.CheckedChanged+=delegate{store();};autoRed.CheckedChanged+=delegate{store();};comments.TextChanged+=delegate{if(!loading)photo.Comment=comments.Text;};
                 standard.CheckedChanged+=delegate{store();};smooth.CheckedChanged+=delegate{store();};
                 Ui.Button(right,"Apply to All Photos",59,343,179,21,delegate{foreach(var p in Selected){var points=p.Adjustments.ManualEyePoints; p.Adjustments=photo.Adjustments.Clone();p.Adjustments.ManualEyePoints=points;}UpdatePage();});
@@ -68,6 +70,29 @@ namespace FrameSpool
         }
         static TrackBar Slider(Control parent,int x,int y,int width,int min,int max,int value)
         {var t=new TrackBar{Bounds=new Rectangle(x,y,width,40),Minimum=min,Maximum=max,Value=Math.Max(min,Math.Min(max,value)),TickStyle=TickStyle.None,AutoSize=false,SmallChange=1,LargeChange=5};parent.Controls.Add(t);return t;}
+        void ShowHistogram(PhotoItem photo)
+        {
+            using(var dialog=Ui.Dialog("RGB Histogram",500,260))using(var image=PhotoEngine.CreateHistogram(photo,470,190))
+            {dialog.Controls.Add(new PictureBox{Bounds=new Rectangle(15,15,470,190),Image=image});Ui.Button(dialog,"Close",395,222,90,23,delegate{dialog.Close();});dialog.ShowDialog(this);}
+        }
+        void ShowRawDevelopment(PhotoItem photo)
+        {
+            if(!photo.IsRaw)return;
+            using(var dialog=Ui.Dialog("RAW Development",520,412))
+            {
+                var previewImage=new CorrectionCanvas{Bounds=new Rectangle(15,12,490,250)};dialog.Controls.Add(previewImage);
+                Ui.Label(dialog,"Exposure (EV)",15,281,135,22);
+                var exposure=new NumericUpDown{Bounds=new Rectangle(158,281,95,24),Minimum=-3,Maximum=3,Increment=.5m,DecimalPlaces=1,Value=Math.Max(-3,Math.Min(3,photo.Adjustments.RawExposureSteps*.5m))};dialog.Controls.Add(exposure);
+                Ui.Label(dialog,"White Balance",15,315,135,22);
+                var balance=Ui.Combo(dialog,new[]{"As Shot","Daylight","Cloudy","Shade","Fluorescent","Incandescent","Flash"},158,315,220,photo.Adjustments.RawWhiteBalance,null);
+                balance.Enabled=!photo.Adjustments.Monochrome;
+                Ui.Label(dialog,"Camera presets are used when available. Other presets use temperature estimates.",15,346,490,30);
+                Action render=delegate{try{photo.Adjustments.RawExposureSteps=(int)(exposure.Value*2);photo.Adjustments.RawWhiteBalance=balance.Text;previewImage.SetImage(PhotoEngine.RenderImage(photo,true));}catch(Exception ex){MessageBox.Show(dialog,ex.Message,"RAW Development");}};
+                exposure.ValueChanged+=delegate{render();};balance.SelectedIndexChanged+=delegate{render();};
+                Ui.Button(dialog,"Reset",15,381,90,23,delegate{exposure.Value=0;balance.SelectedItem="As Shot";render();});
+                Ui.Button(dialog,"Close",415,381,90,23,delegate{dialog.Close();});render();dialog.ShowDialog(this);
+            }
+        }
         void ShowPortrait(PhotoItem photo)
         {
             using(var f=Ui.Dialog("Portrait Enhance",792,566))
@@ -78,8 +103,10 @@ namespace FrameSpool
                 Ui.Label(f,"Image View",551,83,220,16);var single=new RadioButton{Text="Single (Modified Image)",Bounds=new Rectangle(556,111,220,19)};var dual=new RadioButton{Text="Dual (Original and Modified)",Bounds=new Rectangle(556,137,230,19),Checked=true};f.Controls.Add(single);f.Controls.Add(dual);
                 Ui.Label(f,"Face Definition",551,190,220,16);var face=Slider(f,592,207,137,0,5,photo.Adjustments.FaceDefinition);Ui.Label(f,"0",577,220,14,16);Ui.Label(f,"5",732,220,14,16);
                 Ui.Label(f,"Skin Radiance",551,260,220,16);var skin=Slider(f,592,277,137,0,5,photo.Adjustments.SkinRadiance);Ui.Label(f,"0",577,290,14,16);Ui.Label(f,"5",732,290,14,16);
-                Ui.Label(f,"Slimming Correction",551,330,220,16);var slim=Slider(f,592,352,137,0,3,photo.Adjustments.Slimming);
-                Action render=delegate{photo.Adjustments.FaceDefinition=face.Value;photo.Adjustments.SkinRadiance=skin.Value;photo.Adjustments.Slimming=slim.Value;original.SetImage(PhotoEngine.RenderImage(photo,false));modified.SetImage(PhotoEngine.RenderImage(photo,true));};
+                Ui.Label(f,"Slimming Correction",551,330,220,16);var slim=Slider(f,592,349,137,0,3,photo.Adjustments.Slimming);
+                var direction=Ui.Combo(f,new[]{"Vertical","Horizontal"},592,387,137,photo.Adjustments.SlimmingDirection,null);
+                Action render=delegate{photo.Adjustments.FaceDefinition=face.Value;photo.Adjustments.SkinRadiance=skin.Value;photo.Adjustments.Slimming=slim.Value;photo.Adjustments.SlimmingDirection=direction.Text;original.SetImage(PhotoEngine.RenderImage(photo,false));modified.SetImage(PhotoEngine.RenderImage(photo,true));};
+                direction.SelectedIndexChanged+=delegate{render();};
                 face.ValueChanged+=delegate{render();};skin.ValueChanged+=delegate{render();};slim.ValueChanged+=delegate{render();};
                 single.CheckedChanged+=delegate{original.Visible=!single.Checked;modified.Bounds=single.Checked?new Rectangle(12,90,502,390):new Rectangle(268,90,246,390);};
                 bool portraitSize=Math.Min(photo.Width,photo.Height)>=240;face.Enabled=portraitSize;skin.Enabled=portraitSize&&!photo.Adjustments.Monochrome;

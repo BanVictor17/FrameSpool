@@ -11,9 +11,9 @@ New-Item -ItemType Directory -Path $taskStandalone | Out-Null
 $taskStandaloneExe = Join-Path $taskStandalone 'FrameSpool.exe'
 Copy-Item -LiteralPath $taskExe -Destination $taskStandaloneExe
 $taskVerifier = Start-Process -FilePath $taskStandaloneExe -ArgumentList @('--self-test', ('"' + $taskResults + '"')) -WorkingDirectory $taskStandalone -WindowStyle Hidden -PassThru
-if (-not $taskVerifier.WaitForExit(60000)) {
+if (-not $taskVerifier.WaitForExit(180000)) {
     Stop-Process -Id $taskVerifier.Id
-    throw 'Standalone verification exceeded 60 seconds.'
+    throw 'Standalone verification exceeded 180 seconds.'
 }
 $taskVerifier.Refresh()
 if ($taskVerifier.ExitCode -ne 0) { throw ('Verification failed. Read ' + (Join-Path $taskResults 'verification.txt')) }

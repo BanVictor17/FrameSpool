@@ -147,10 +147,16 @@ namespace FrameSpool
             Size = image == null ? new Size(100, 30) : image.Size;
         }
 
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+
         public string ImagePath { get { return imagePath; } set { imagePath = value; Invalidate(); } }
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public Rectangle CaptionRectangle { get { return captionRectangle; } set { captionRectangle = value; Invalidate(); } }
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public ContentAlignment CaptionAlignment { get { return captionAlignment; } set { captionAlignment = value; Invalidate(); } }
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public float TextPixelSize { get { return textPixelSize; } set { textPixelSize = Math.Max(1, value); Invalidate(); } }
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public bool TextBold { get { return textBold; } set { textBold = value; Invalidate(); } }
 
         private string StatePath(char state)

@@ -61,112 +61,93 @@ namespace FrameSpool
             combo.EndUpdate();
         }
 
+        static void SetDriverChoices(ComboBox combo,List<DriverChoice> choices,string selected)
+        {
+            combo.Items.Clear();
+            combo.Items.Add(new DriverChoice{Id="",Label="Use Printer Properties"});
+            foreach(var choice in choices)combo.Items.Add(choice);
+            combo.SelectedItem=combo.Items.Cast<DriverChoice>().FirstOrDefault(c=>c.Id==selected)??combo.Items[0];
+            combo.Enabled=choices.Count>0;
+        }
+        static string SelectedDriverId(ComboBox combo){var choice=combo.SelectedItem as DriverChoice;return choice==null?"":choice.Id;}
         void ShowPrinterSettings()
         {
-            using (Form dialog = Ui.Dialog("Printer Settings", 300, 550))
-            using (ToolTip tooltips = new ToolTip())
+            using(Form dialog=Ui.Dialog("Printer Settings",300,550))using(var tooltips=new ToolTip())
             {
                 var staged=new PrintOptions();CopyOptions(Options,staged);
-                Ui.Label(dialog, "Printer", 20, 32, 261, 16);
-                ComboBox printers = PrintCombo(dialog, new Rectangle(28, 48, 250, 24));
-                Ui.Label(dialog, "Paper Source", 20, 72, 261, 16);
-                ComboBox sources = PrintCombo(dialog, new Rectangle(28, 88, 250, 24));
-                CheckBox borderless = Ui.Check(dialog, "Borderless", 180, 116, 100, Options.Borderless, null);
-                Ui.Label(dialog, "Paper Size", 20, 133, 261, 16);
-                ComboBox papers = PrintCombo(dialog, new Rectangle(28, 149, 250, 24));
-                Ui.Label(dialog, "Paper Type", 20, 173, 261, 16);
-                ComboBox media = PrintCombo(dialog, new Rectangle(28, 189, 250, 24));
-                Ui.Label(dialog, "Print Mode", 20, 213, 261, 16);
-                ComboBox modes = PrintCombo(dialog, new Rectangle(28, 229, 250, 24));
-                Ui.Label(dialog, "Borderless", 20, 253, 261, 16);
-                Ui.Label(dialog, "Min", 20, 282, 72, 16).TextAlign = ContentAlignment.MiddleRight;
-                TrackBar expansion = new TrackBar { Bounds = new Rectangle(100, 269, 86, 40),
-                    Minimum = 0, Maximum = 2, TickStyle = TickStyle.None, Value = Math.Max(0, Math.Min(2, Options.Expansion)) };
-                dialog.Controls.Add(expansion);
-                Ui.Label(dialog, "Max", 194, 282, 100, 16);
-                Ui.Label(dialog, "Caution", 20, 305, 261, 16);
-                TextBox caution = new TextBox { Bounds = new Rectangle(28, 325, 250, 140),
-                    Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Color.White,
-                    Font = Ui.Font(12), Text = "Print quality in the top and bottom areas may decline or the area may be smeared depending on the media. For details about this setting, see online help or your manual." };
-                dialog.Controls.Add(caution);
-                caution.Text += "\r\n\r\nFor printer-specific media, quality and borderless settings (including L8050), use Properties.";
-                Ui.Button(dialog,"Properties...",190,479,95,23,delegate
+                Ui.Label(dialog,"Printer",20,32,261,16);var printers=PrintCombo(dialog,new Rectangle(28,48,250,24));
+                Ui.Label(dialog,"Paper Source",20,72,261,16);var sources=PrintCombo(dialog,new Rectangle(28,88,250,24));
+                var borderless=Ui.Check(dialog,"Borderless",180,116,100,staged.Borderless,null);
+                Ui.Label(dialog,"Paper Size",20,133,261,16);var papers=PrintCombo(dialog,new Rectangle(28,149,250,24));
+                Ui.Label(dialog,"Paper Type",20,173,261,16);var media=PrintCombo(dialog,new Rectangle(28,189,250,24));
+                Ui.Label(dialog,"Print Mode",20,213,261,16);var quality=PrintCombo(dialog,new Rectangle(28,229,250,24));
+                Ui.Label(dialog,"Resolution",20,253,261,16);var resolution=PrintCombo(dialog,new Rectangle(28,269,250,24));
+                Ui.Label(dialog,"Driver Settings",20,305,261,16);
+                var information=new TextBox{Bounds=new Rectangle(28,325,250,140),Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,BackColor=Color.White,Font=Ui.Font(12)};dialog.Controls.Add(information);
+                Ui.Button(dialog,"Help",190,15,95,21,delegate{ShowHelp("Printer Settings");});
+                var ok=Ui.Button(dialog,"OK",109,514,85,23,delegate{dialog.DialogResult=DialogResult.OK;});
+                var cancel=Ui.Button(dialog,"Cancel",200,514,85,23,delegate{dialog.DialogResult=DialogResult.Cancel;});dialog.AcceptButton=ok;dialog.CancelButton=cancel;
+                var installed=new List<string>();try{foreach(string name in PrinterSettings.InstalledPrinters)installed.Add(name);}catch{}
+                SetPrintChoices(printers,installed,staged.Printer);printers.Enabled=installed.Count>0;
+                string[] order={"4x6NP","3.5x5","5x7","8x10","10x12","4x7.11","HAGAKI","A6","Letter","A4","A3","A3N","R100","R5IN","RA4","RA3N"};
+                foreach(string code in order.Concat(FrameSpool.LayoutEngine.Catalog.Select(l=>l.Paper)).Distinct())
+                    if(FrameSpool.LayoutEngine.ForPaper(code).Count>0)papers.Items.Add(new PaperChoice{Code=code,Label=PaperLabel(code)});
+                papers.SelectedItem=papers.Items.Cast<PaperChoice>().FirstOrDefault(p=>p.Code==staged.Paper)??papers.Items[0];
+                Action<bool> load=delegate(bool native)
                 {
-                    staged.Printer=printers.Text;staged.Source=sources.Text;staged.PaperType=media.Text;staged.Mode=modes.Text;
-                    var choice=papers.SelectedItem as PaperChoice;if(choice!=null)staged.Paper=choice.Code;
-                    var layout=FrameSpool.LayoutEngine.ForPaper(staged.Paper).FirstOrDefault();if(layout==null)return;
-                    try{if(DriverSettings.Configure(dialog,layout,staged)){SetPrintChoices(sources,sources.Items.Cast<object>().Select(o=>o.ToString()).ToArray(),staged.Source);SetPrintChoices(media,new[]{"Printer Properties"},staged.PaperType);SetPrintChoices(modes,new[]{"Printer Properties"},staged.Mode);}}
-                    catch(Exception error){MessageBox.Show(dialog,error.Message,"Printer Properties");}
-                });
-                Ui.Button(dialog, "Help", 190, 15, 95, 21, delegate { ShowHelp("Printer Settings"); });
-                Button ok = Ui.Button(dialog, "OK", 109, 514, 85, 23, delegate { dialog.DialogResult = DialogResult.OK; });
-                Button cancel = Ui.Button(dialog, "Cancel", 200, 514, 85, 23, delegate { dialog.DialogResult = DialogResult.Cancel; });
-                dialog.AcceptButton = ok; dialog.CancelButton = cancel;
-                List<string> installed = new List<string>();
-                try { foreach (string name in PrinterSettings.InstalledPrinters) installed.Add(name); } catch { }
-                SetPrintChoices(printers, installed, Options.Printer);
-                if (printers.Items.Count == 0) printers.Enabled = false;
-
-                string[] order = { "4x6NP", "3.5x5", "5x7", "8x10", "10x12", "4x7.11", "HAGAKI", "A6", "Letter", "A4", "A3", "A3N", "R100", "R5IN", "RA4", "RA3N" };
-                foreach (string code in order.Concat(FrameSpool.LayoutEngine.Catalog.Select(l => l.Paper)).Distinct())
-                    if (FrameSpool.LayoutEngine.ForPaper(code).Count > 0) papers.Items.Add(new PaperChoice { Code = code, Label = PaperLabel(code) });
-                if (!papers.Items.Cast<PaperChoice>().Any(p => p.Code == Options.Paper))
-                    papers.Items.Add(new PaperChoice { Code = Options.Paper, Label = PaperLabel(Options.Paper) });
-                papers.SelectedItem = papers.Items.Cast<PaperChoice>().First(p => p.Code == Options.Paper);
-                SetPrintChoices(media, new string[] { "Plain Paper", "Ultra Glossy", "Premium Glossy", "Premium Semigloss", "Glossy", "Photo", "Matte", "Photo Quality Ink Jet" }, Options.PaperType);
-                SetPrintChoices(modes, new string[] { "Draft", "Text", "Text & Image", "Photo", "Best Photo" }, Options.Mode);
-
-                Action loadCapabilities = delegate
-                {
-                    string preferredSource = sources.SelectedIndex < 0 ? Options.Source : sources.Text;
-                    List<string> availableSources = new List<string>();
-                    List<string> reportedPapers = new List<string>();
-                    List<string> reportedModes = new List<string>();
+                    staged.Printer=printers.Text;var paper=papers.SelectedItem as PaperChoice;if(paper!=null)staged.Paper=paper.Code;
+                    var available=new List<string>();var reported=new List<string>();DriverCapabilities capabilities=null;
                     try
                     {
-                        PrinterSettings settings = new PrinterSettings();
-                        if (printers.SelectedIndex >= 0) settings.PrinterName = printers.Text;
-                        if (settings.IsValid)
+                        using(var document=new PrintDocument())
                         {
-                            foreach (PaperSource source in settings.PaperSources) availableSources.Add(source.SourceName);
-                            foreach (PaperSize size in settings.PaperSizes) reportedPapers.Add(size.PaperName);
-                            foreach (PrinterResolution resolution in settings.PrinterResolutions)
-                                reportedModes.Add(resolution.X > 0 && resolution.Y > 0
-                                    ? resolution.X + " x " + resolution.Y + " dpi" : resolution.Kind.ToString());
+                            document.PrinterSettings.PrinterName=staged.Printer;
+                            if(document.PrinterSettings.IsValid)
+                            {
+                                foreach(PaperSource source in document.PrinterSettings.PaperSources)available.Add(source.SourceName);
+                                foreach(PaperSize size in document.PrinterSettings.PaperSizes)reported.Add(size.PaperName);
+                                var query=new PrintOptions();CopyOptions(staged,query);query.DriverOptionsPrinter="";
+                                PrinterProfile.Apply(document,FrameSpool.LayoutEngine.ForPaper(staged.Paper).First(),query);
+                                capabilities=DriverCapabilities.Read(document);
+                            }
                         }
                     }
-                    catch { }
-                    if (availableSources.Count == 0) availableSources.Add("Sheet");
-                    SetPrintChoices(sources, availableSources, preferredSource);
-                    string capabilities = reportedPapers.Count == 0 ? "" : "Paper sizes reported by the selected printer:\r\n" + String.Join("\r\n", reportedPapers.Distinct().ToArray());
-                    tooltips.SetToolTip(papers, capabilities);
-                    SetPrintChoices(modes, new string[] { "Draft", "Text", "Text & Image", "Photo", "Best Photo" }.Concat(reportedModes), modes.Text);
+                    catch(Exception ex){information.Text=ex.Message;}
+                    SetPrintChoices(sources,available,staged.Source);sources.Enabled=available.Count>0;
+                    tooltips.SetToolTip(papers,"Driver paper sizes: "+String.Join(", ",reported.ToArray()));
+                    if(capabilities==null)capabilities=new DriverCapabilities{Error="No installed printer is selected."};
+                    bool saved=staged.DriverOptionsPrinter==staged.Printer;
+                    SetDriverChoices(media,capabilities.Media,saved?staged.DriverMedia:capabilities.Selected("PageMediaType"));
+                    SetDriverChoices(quality,capabilities.Quality,saved?staged.DriverQuality:capabilities.Selected("PageOutputQuality"));
+                    SetDriverChoices(resolution,capabilities.Resolution,saved?staged.DriverResolution:capabilities.Selected("PageResolution"));
+                    borderless.Enabled=capabilities.SupportsBorderless;
+                    borderless.Checked=capabilities.SupportsBorderless&&(native||!saved?capabilities.BorderlessSelected:staged.Borderless);
+                    information.Text=capabilities.Error==null?"These options are reported and validated by the selected Windows driver.\r\n\r\nUse Properties for additional driver settings, including borderless expansion, colour management and roll-paper limits.":"This driver does not expose Print Schema options. Use Properties to select media, quality and borderless settings.\r\n\r\n"+capabilities.Error;
+                    tooltips.SetToolTip(borderless,borderless.Enabled?"Supported by the selected driver":"Use Properties if this driver provides borderless printing.");
                 };
-                printers.SelectedIndexChanged += delegate { loadCapabilities(); };
-                loadCapabilities();
-                Action updateBorderless = delegate { expansion.Enabled = borderless.Checked; };
-                borderless.CheckedChanged += delegate { updateBorderless(); }; updateBorderless();
-
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                PaperChoice paper = papers.SelectedItem as PaperChoice;
-                bool paperChanged = paper != null && paper.Code != Options.Paper;
-                Options.Printer = printers.SelectedIndex >= 0 ? printers.Text : Options.Printer;
-                Options.Source = sources.Text; Options.PaperType = media.Text; Options.Mode = modes.Text;
-                Options.DriverMode=staged.DriverMode;Options.DriverModePrinter=staged.DriverModePrinter;Options.DriverModePaper=staged.DriverModePaper;Options.DriverModeLandscape=staged.DriverModeLandscape;
-                Options.Borderless = borderless.Checked; Options.Expansion = expansion.Value;
-                if (paper != null) Options.Paper = paper.Code;
-                if (paperChanged)
+                Ui.Button(dialog,"Properties...",190,479,95,23,delegate
                 {
-                    CurrentLayout = FrameSpool.LayoutEngine.ForPaper(Options.Paper).FirstOrDefault();
-                    pageIndex = 0;
-                    RadioButton photoLayout = photoLayoutRadio;
-                    if (photoLayout != null) photoLayout.Checked = true;
-                    FillLayouts(false);
-                }
-                UpdatePrinterSummary(); UpdatePage();
+                    staged.Printer=printers.Text;staged.Source=sources.Text;var paper=papers.SelectedItem as PaperChoice;if(paper!=null)staged.Paper=paper.Code;
+                    staged.DriverMedia=SelectedDriverId(media);staged.DriverQuality=SelectedDriverId(quality);staged.DriverResolution=SelectedDriverId(resolution);staged.DriverOptionsPrinter=staged.Printer;staged.Borderless=borderless.Checked;
+                    try{if(DriverSettings.Configure(dialog,FrameSpool.LayoutEngine.ForPaper(staged.Paper).First(),staged))load(true);}
+                    catch(Exception ex){MessageBox.Show(dialog,ex.Message,"Printer Properties");}
+                });
+                printers.SelectedIndexChanged+=delegate{if(staged.Printer!=printers.Text){staged.DriverOptionsPrinter="";staged.Source="";}load(false);};
+                papers.SelectedIndexChanged+=delegate{load(false);};load(false);
+                if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+                var selectedPaper=papers.SelectedItem as PaperChoice;bool changed=selectedPaper!=null&&selectedPaper.Code!=Options.Paper;
+                staged.Printer=printers.Text;staged.Source=sources.Text;staged.Paper=selectedPaper==null?staged.Paper:selectedPaper.Code;
+                staged.PaperType=media.Text;staged.Mode=quality.Text;staged.Borderless=borderless.Enabled&&borderless.Checked;
+                staged.DriverMedia=SelectedDriverId(media);staged.DriverQuality=SelectedDriverId(quality);staged.DriverResolution=SelectedDriverId(resolution);
+                staged.DriverOptionsPrinter=media.Enabled||quality.Enabled||resolution.Enabled||borderless.Enabled?staged.Printer:"";
+                // Validate the requested combination before saving it.
+                try{using(var document=new PrintDocument()){document.PrinterSettings.PrinterName=staged.Printer;if(document.PrinterSettings.IsValid)PrinterProfile.Apply(document,FrameSpool.LayoutEngine.ForPaper(staged.Paper).First(),staged);}}
+                catch(Exception ex){MessageBox.Show(this,ex.Message,"Printer Settings",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
+                CopyOptions(staged,Options);
+                if(changed){CurrentLayout=FrameSpool.LayoutEngine.ForPaper(Options.Paper).FirstOrDefault();pageIndex=0;if(photoLayoutRadio!=null)photoLayoutRadio.Checked=true;FillLayouts(false);}
+                UpdatePrinterSummary();UpdatePage();
             }
         }
-
         private List<PhotoItem> CurrentPositionPhotos()
         {
             if (Pages.Count == 0 || pageIndex < 0 || pageIndex >= Pages.Count) return new List<PhotoItem>();
@@ -295,7 +276,7 @@ namespace FrameSpool
                 Label totalValue = Ui.Label(dialog, Pages.Sum(p => p.Copies).ToString(), 117, 493, 38, 33); totalValue.TextAlign = ContentAlignment.MiddleRight;
                 Ui.Label(dialog, "prints", 157, 493, 70, 33).TextAlign = ContentAlignment.MiddleLeft;
                 Ui.Label(dialog, "Copies per Page:", 227, 493, 125, 33).TextAlign = ContentAlignment.MiddleRight;
-                NumericUpDown all = Ui.Number(dialog, 354, 493, 44, 1, 99, 1, null);
+                NumericUpDown all = Ui.Number(dialog, 354, 493, 44, 0, 99, 1, null);
                 Ui.Label(dialog, "copies", 402, 494, 60, 23);
                 List<NumericUpDown> counts = new List<NumericUpDown>();
                 List<PagePreview> thumbnails = new List<PagePreview>();
@@ -309,7 +290,7 @@ namespace FrameSpool
                         LayoutDefinition = CurrentLayout, Page = Pages[index], Options = Options, Corrected = false };
                     card.Controls.Add(thumbnail); thumbnails.Add(thumbnail);
                     Ui.Label(card, (index + 1).ToString(), 6, 166, 29, 18);
-                    NumericUpDown count = Ui.Number(card, 43, 162, 47, 1, 99, Pages[index].Copies, delegate(int number)
+                    NumericUpDown count = Ui.Number(card, 43, 162, 47, 0, 99, Pages[index].Copies, delegate(int number)
                     { Pages[index].Copies = number; pageCopyCounts[index.ToString()] = number; updateTotal(); });
                     counts.Add(count); Ui.Label(card, "copies", 96, 166, 55, 18);
                     Action select = delegate { pageIndex = index; UpdatePage(); foreach (PagePreview image in thumbnails) image.BackColor = image == thumbnail ? Color.LightSteelBlue : Color.FromArgb(235, 236, 238); };

@@ -4,7 +4,7 @@ FrameSpool's C# code and build scripts were written independently. The MIT licen
 
 ## Built-in data
 
-The interface artwork in `assets/EPQImage/` and `assets/Image/`, the application icon, and the 135 template definitions in `assets/layouts.json` were recovered from Epson Easy Photo Print. TGA images were converted to PNG for decoding. The artwork and template data retain their original copyright ownership; FrameSpool does not claim to have created them.
+The interface artwork in `assets/EPQImage/` and `assets/Image/`, the application icon, and the 143 template definitions (135 FD2 and eight USD roll layouts) in `assets/layouts.json` were recovered from Epson Easy Photo Print. TGA images were converted to PNG for decoding. The four white EFF oval masks in `assets/LegacyDecorations` were decoded into PNG alpha overlays; crop marks and caption geometry remain derived template data. The artwork and template data retain their original copyright ownership; FrameSpool does not claim to have created them.
 
 The repository maintainer confirmed permission to redistribute these assets on 2026-10-11. The original permission document and its specific terms were not supplied to the development agent. Include any conditions or notices required by that permission with distributed copies. This confirmation is not a new open-source license for the assets and does not establish unrestricted downstream relicensing rights.
 

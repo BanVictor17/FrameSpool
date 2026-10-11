@@ -39,8 +39,10 @@ namespace FrameSpool
             if(pointer==IntPtr.Zero){GlobalFree(handle);throw new Win32Exception();}
             try{Marshal.Copy(bytes,0,pointer,bytes.Length);}finally{GlobalUnlock(handle);}return handle;
         }
-        static byte[] CurrentMode(PrintDocument document)
+        internal static byte[] CurrentMode(PrintDocument document)
         {IntPtr handle=document.PrinterSettings.GetHdevmode(document.DefaultPageSettings);try{return ReadHandle(handle);}finally{GlobalFree(handle);}}
+        internal static void SetMode(PrintDocument document,byte[] bytes)
+        {IntPtr handle=WriteHandle(bytes);try{document.PrinterSettings.SetHdevmode(handle);document.DefaultPageSettings.SetHdevmode(handle);}finally{GlobalFree(handle);}}
         public static bool Apply(PrintDocument document,PrintOptions options)
         {
             if(String.IsNullOrEmpty(options.DriverMode)||!String.Equals(options.DriverModePrinter,document.PrinterSettings.PrinterName,StringComparison.OrdinalIgnoreCase)||!document.PrinterSettings.IsValid)return false;
@@ -78,6 +80,7 @@ namespace FrameSpool
                         byte[] bytes=new byte[size];Marshal.Copy(buffer,bytes,0,size);
                         IntPtr handle=WriteHandle(bytes);try{document.PrinterSettings.SetHdevmode(handle);document.DefaultPageSettings.SetHdevmode(handle);}finally{GlobalFree(handle);}
                         Capture(document,options);
+                        options.DriverMedia=options.DriverQuality=options.DriverResolution=options.DriverOptionsPrinter="";
                         options.Source=document.DefaultPageSettings.PaperSource.SourceName;options.Mode="Printer Properties";options.PaperType="Printer Properties";
                         return true;
                     }

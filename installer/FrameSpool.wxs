@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="$(var.ProductCode)" Name="FrameSpool" Language="1033" Version="$(var.AppVersion)" Manufacturer="FrameSpool contributors" UpgradeCode="AD465D70-5B51-4F54-B655-F75F1D68422A">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perUser" InstallPrivileges="limited" Platform="x64" Description="Photo layouts, corrections and Windows driver printing" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of FrameSpool is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Property Id="ARPPRODUCTICON" Value="FrameSpoolIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/BanVictor17/FrameSpool" />
+    <Property Id="INSTALLDESKTOPSHORTCUT" Value="0" Secure="yes" />
+    <Property Id="WIXUI_INSTALLDIR" Value="APPDIR" />
+    <Property Id="APPDIR" Secure="yes">
+      <RegistrySearch Id="SavedInstallDirectory" Root="HKCU" Key="Software\FrameSpool\Installer" Name="InstallDirectory" Type="raw" Win64="yes" />
+    </Property>
+    <Icon Id="FrameSpoolIcon" SourceFile="$(var.AppIcon)" />
+    <Condition Message="FrameSpool requires 64-bit Windows 10 or 11.">Installed OR VersionNT64</Condition>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder"><Directory Id="ProgramsDirectory" Name="Programs"><Directory Id="APPDIR" Name="FrameSpool">
+        <Component Id="Application" Guid="28BBDDF9-385E-48D4-B987-7B80E6675DF0" Win64="yes">
+          <File Id="FrameSpoolExe" Source="$(var.SourceDir)\FrameSpool.exe" />
+          <RegistryValue Root="HKCU" Key="Software\FrameSpool\Installer" Name="Application" Type="integer" Value="1" KeyPath="yes" />
+          <RegistryValue Root="HKCU" Key="Software\FrameSpool\Installer" Name="InstallDirectory" Type="string" Value="[APPDIR]" />
+          <RemoveFolder Id="RemoveAppDirectory" On="uninstall" />
+          <RemoveFolder Id="RemoveEmptyProgramsDirectory" Directory="ProgramsDirectory" On="uninstall" />
+        </Component>
+      </Directory></Directory></Directory>
+      <Directory Id="ProgramMenuFolder"><Directory Id="FrameSpoolMenu" Name="FrameSpool">
+        <Component Id="StartMenuShortcut" Guid="D9D7C64F-145F-4424-AEBA-CFAB314AFCFD" Win64="yes">
+          <Shortcut Id="StartMenuEntry" Name="FrameSpool" Target="[APPDIR]FrameSpool.exe" WorkingDirectory="APPDIR" Icon="FrameSpoolIcon" />
+          <RegistryValue Root="HKCU" Key="Software\FrameSpool\Installer" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+          <RemoveFolder Id="RemoveMenuDirectory" On="uninstall" />
+        </Component>
+      </Directory></Directory>
+      <Directory Id="DesktopFolder">
+        <Component Id="DesktopShortcut" Guid="248226F1-0DF1-46E7-92F2-377E92EC0DAC" Win64="yes" Transitive="yes">
+          <Condition>INSTALLDESKTOPSHORTCUT = "1"</Condition>
+          <Shortcut Id="DesktopEntry" Name="FrameSpool" Target="[APPDIR]FrameSpool.exe" WorkingDirectory="APPDIR" Icon="FrameSpoolIcon" />
+          <RegistryValue Root="HKCU" Key="Software\FrameSpool\Installer" Name="Desktop" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </Directory>
+    <Feature Id="MainFeature" Title="FrameSpool" Level="1">
+      <ComponentRef Id="Application" /><ComponentRef Id="StartMenuShortcut" /><ComponentRef Id="DesktopShortcut" /><ComponentGroupRef Id="Documentation" />
+    </Feature>
+    <UIRef Id="WixUI_InstallDir" /><UIRef Id="WixUI_ErrorProgressText" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+  </Product>
+</Wix>

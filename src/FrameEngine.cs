@@ -14,6 +14,12 @@ namespace FrameSpool
     public sealed class FrameElement
     {
         public string Kind="Opening",Text="",ImagePath="";
+        public string CaptionRole="",CaptionValue="",FontFamily="Arial",TextAlignment="Left",TextVerticalAlignment="Top";
+        public int CaptionPhotoIndex;
+        public bool VerticalText;
+        public bool ReverseLine;
+        public string ImageDirection="0",ImageGroup="";
+        public int ImageRotation;
         public float X=.1f,Y=.1f,Width=.8f,Height=.8f,Rotation,Points=18,Thickness=2;
         public int ColorArgb=Color.Black.ToArgb();
         public RectangleF Bounds{get{return new RectangleF(X,Y,Width,Height);}}
@@ -31,11 +37,13 @@ namespace FrameSpool
         public PhotoLayout ToLayout()
         {
             var layout=new PhotoLayout{Id="custom:"+Id,Name=Name,Paper=Paper,Width=Width,Height=Height,Design=this};
-            foreach(var element in Elements.Where(IsOpening))layout.Frames.Add(element.Bounds);
+            foreach(var element in Elements.Where(IsOpening))
+            {layout.Frames.Add(element.Bounds);layout.Images.Add(new LayoutImage{Direction=element.ImageDirection,Group=element.ImageGroup,Rotation=element.ImageRotation});}
+            layout.Info=Elements.Any(e=>e.CaptionRole=="info"||e.CaptionRole=="exif");layout.Comments=Elements.Any(e=>e.CaptionRole=="comment");
             return layout;
         }
         public static bool IsOpening(FrameElement element){return element.Kind=="Opening"||element.Kind=="Ellipse Opening";}
-        public void Draw(Graphics graphics,RectangleF page,PhotoPage content,bool corrected,PhotoItem focus,bool editor)
+        public void Draw(Graphics graphics,RectangleF page,PhotoPage content,bool corrected,PhotoItem focus,bool editor,PrintOptions options=null)
         {
             using(var brush=new SolidBrush(Color.FromArgb(BackingColor)))graphics.FillRectangle(brush,page);
             int position=0;
@@ -53,7 +61,13 @@ namespace FrameSpool
                         {
                             if(item.Kind=="Ellipse Opening")path.AddEllipse(box);else path.AddRectangle(box);
                             graphics.SetClip(path,CombineMode.Intersect);
-                            if(photo!=null)PhotoEngine.DrawPhoto(graphics,photo,box,corrected,0,page.Width/Width,page.Height/Height);
+                            if(photo!=null)
+                            {
+                                int imageRotation=item.ImageRotation;
+                                if(item.ImageDirection=="180")imageRotation+=2;
+                                if((item.ImageDirection=="AutoLeft"||item.ImageDirection=="Auto")&&(photo.Width>=photo.Height)!=(box.Width>=box.Height))imageRotation+=3;
+                                PhotoEngine.DrawPhoto(graphics,photo,box,corrected,imageRotation,page.Width/Width,page.Height/Height);
+                            }
                             else if(editor)graphics.FillRectangle(Brushes.LightSteelBlue,box);
                             graphics.ResetClip();
                             if(editor||photo==focus&&photo!=null)using(var pen=new Pen(photo==focus?Color.RoyalBlue:Color.SlateGray,1))graphics.DrawPath(pen,path);
@@ -61,11 +75,21 @@ namespace FrameSpool
                         position++;
                     }
                     else if(item.Kind=="Decoration"&&File.Exists(item.ImagePath))
-                    {using(var image=Image.FromFile(item.ImagePath))graphics.DrawImage(image,box,new RectangleF(0,0,image.Width,image.Height),GraphicsUnit.Pixel);}
+                    {using(var image=Image.FromFile(item.ImagePath))using(var attributes=new ImageAttributes()){attributes.SetWrapMode(WrapMode.TileFlipXY);graphics.DrawImage(image,new[]{new PointF(box.Left,box.Top),new PointF(box.Right,box.Top),new PointF(box.Left,box.Bottom)},new RectangleF(0,0,image.Width,image.Height),GraphicsUnit.Pixel,attributes);}}
                     else if(item.Kind=="Text")
-                    {using(var font=new Font("Arial",Math.Max(.5f,item.Points*5*page.Width/Width),GraphicsUnit.Pixel))using(var brush=new SolidBrush(Color.FromArgb(item.ColorArgb)))graphics.DrawString(item.Text,font,brush,box);}
+                    {
+                        string caption=item.Text;
+                        if(!editor&&!String.IsNullOrEmpty(item.CaptionRole))
+                        {
+                            if(options==null)options=new PrintOptions();
+                            if((item.CaptionRole=="info"||item.CaptionRole=="exif")&&!options.PrintInfo)continue;
+                            var photo=content!=null&&item.CaptionPhotoIndex>=0&&item.CaptionPhotoIndex<content.Photos.Count?content.Photos[item.CaptionPhotoIndex]:null;
+                            caption=LayoutEngine.CaptionText(item.CaptionRole,item.CaptionValue,photo,options);
+                        }
+                        LayoutEngine.DrawCaption(graphics,box,caption,new LayoutCaption{Family=item.FontFamily,Points=item.Points,Color=Color.FromArgb(item.ColorArgb),Alignment=item.TextAlignment,VerticalAlignment=item.TextVerticalAlignment,Vertical=item.VerticalText},page.Width/Width);
+                    }
                     else using(var pen=new Pen(Color.FromArgb(item.ColorArgb),Math.Max(.5f,item.Thickness*page.Width/Width)))
-                    {if(item.Kind=="Line")graphics.DrawLine(pen,box.Left,box.Top,box.Right,box.Bottom);else if(item.Kind=="Box")graphics.DrawRectangle(pen,box.X,box.Y,box.Width,box.Height);}
+                    {if(item.Kind=="Line")graphics.DrawLine(pen,box.Left,item.ReverseLine?box.Bottom:box.Top,box.Right,item.ReverseLine?box.Top:box.Bottom);else if(item.Kind=="Box")graphics.DrawRectangle(pen,box.X,box.Y,box.Width,box.Height);}
                 }
                 finally{graphics.Restore(state);}
             }
@@ -92,7 +116,7 @@ namespace FrameSpool
         public static void Validate(FrameDesign frame)
         {
             if(frame==null||frame.Version!=1||!Finite(frame.Width)||!Finite(frame.Height)||frame.Width<=0||frame.Height<=0||frame.Width>30000||frame.Height>30000)throw new InvalidDataException("Invalid frame size or format.");
-            if(frame.Elements==null||frame.Elements.Count>100||!frame.Elements.Any(FrameDesign.IsOpening))throw new InvalidDataException("A frame needs at least one photo opening and can contain up to 100 items.");
+            if(frame.Elements==null||frame.Elements.Count>1000||!frame.Elements.Any(FrameDesign.IsOpening))throw new InvalidDataException("A frame needs at least one photo opening and can contain up to 1000 items.");
             foreach(var item in frame.Elements)if(item==null||!new[]{"Opening","Ellipse Opening","Decoration","Text","Line","Box"}.Contains(item.Kind)||!Finite(item.X)||!Finite(item.Y)||Math.Abs(item.X)>2||Math.Abs(item.Y)>2||!Finite(item.Width)||!Finite(item.Height)||item.Width<=0||item.Height<=0||item.Width>4||item.Height>4||!Finite(item.Rotation)||!Finite(item.Points)||!Finite(item.Thickness)||item.Points<=0||item.Points>200||item.Thickness<0||item.Thickness>100)throw new InvalidDataException("Invalid frame item.");
             Guid id;if(!Guid.TryParse(frame.Id,out id))frame.Id=Guid.NewGuid().ToString("N");
             if(String.IsNullOrWhiteSpace(frame.Name))frame.Name="New Frame";

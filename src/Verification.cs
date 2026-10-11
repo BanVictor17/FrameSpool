@@ -77,8 +77,8 @@ namespace FrameSpool
                 FrameSpool.LayoutEngine.LoadEmbeddedCatalog();
                 JavaScriptSerializer serializer = new JavaScriptSerializer { MaxJsonLength = 16000000 };
                 List<Dictionary<string, object>> records = serializer.Deserialize<List<Dictionary<string, object>>>(AppAssets.ReadText("layouts.json"));
-                Check(checks, "Catalog contains 135 recovered fd2 records", records.Count == 135, "Source records: " + records.Count);
-                Check(checks, "Catalog accepts all 135 recovered layouts", FrameSpool.LayoutEngine.Catalog.Count == 135, "Loaded layouts: " + FrameSpool.LayoutEngine.Catalog.Count);
+                Check(checks, "Catalog contains 135 FD2 and 8 roll records", records.Count == 143, "Source records: " + records.Count);
+                Check(checks, "Catalog accepts all 143 recovered layouts", FrameSpool.LayoutEngine.Catalog.Count == 143, "Loaded layouts: " + FrameSpool.LayoutEngine.Catalog.Count);
                 Check(checks, "Every accepted layout has at least one frame", FrameSpool.LayoutEngine.Catalog.All(l => l.Frames.Count > 0));
                 Check(checks, "All accepted page dimensions are positive", FrameSpool.LayoutEngine.Catalog.All(l => l.Width > 0 && l.Height > 0));
                 string[] missing = records.Select(r => Convert.ToString(r["file"]))
@@ -253,7 +253,11 @@ namespace FrameSpool
                 using(var small=FrameSpool.LayoutEngine.RenderPage(borderless,one,options,180,false))
                 using(var large=FrameSpool.LayoutEngine.RenderPage(borderless,one,options,360,false))
                 {Check(checks,"Positioning offsets scale consistently with output resolution",SameColor(small.GetPixel(475,80),large.GetPixel(950,160),2)&&SameColor(small.GetPixel(485,80),large.GetPixel(970,160),2));}
+                LegacyFormatVerification.Run(directory,checks);
+                PhotoDecodingVerification.Run(directory,(name,passed)=>Check(checks,name,passed));
                 MainForm.VerifyVisuals(directory,fixture,checks);
+                MainForm.VerifyWorkflows(directory,fixture,checks);
+                DriverVerification.Run(directory,checks);
                 Check(checks,"Driver mode rejects truncated or corrupt buffers",!DriverSettings.IsValidMode(new byte[20])&&!DriverSettings.IsValidMode(new byte[72]));
                 string pdfPrinter=System.Drawing.Printing.PrinterSettings.InstalledPrinters.Cast<string>().FirstOrDefault(p=>p=="Microsoft Print to PDF");
                 if(pdfPrinter!=null)

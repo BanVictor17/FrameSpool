@@ -45,12 +45,18 @@ namespace FrameSpool
         int Columns { get { return SelectionList ? 1 : Math.Max(1, (ClientSize.Width-20) / (TileSize+8)); } }
         int CardWidth { get { return SelectionList ? Math.Max(85,ClientSize.Width-22) : TileSize; } }
         int CardHeight { get { return SelectionList ? Math.Max(100,CardWidth+20) : TileSize+2; } }
-        public void RefreshPhotos() { AutoScrollMinSize = new Size(0, ((Photos.Count + Columns-1)/Columns)*(CardHeight+8)+8); Invalidate(); }
+        public void RefreshPhotos() {
+            var present=new HashSet<string>(Photos.Select(p=>p.FilePath),StringComparer.OrdinalIgnoreCase);
+            foreach(var key in thumbs.Keys.Where(k=>!present.Contains(k)).ToList()){thumbs[key].Dispose();thumbs.Remove(key);}
+            AutoScrollMinSize = new Size(0, ((Photos.Count + Columns-1)/Columns)*(CardHeight+8)+8); Invalidate();
+        }
         protected override void OnResize(EventArgs e) { base.OnResize(e); RefreshPhotos(); }
         Rectangle Card(int index) { return new Rectangle(5+(index%Columns)*(CardWidth+8), 5+(index/Columns)*(CardHeight+8)+AutoScrollPosition.Y, CardWidth,CardHeight); }
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e); e.Graphics.Clear(BackColor); e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            // Retain only visible thumbnails and a small working set while scrolling.
+            if(thumbs.Count>96){var visible=new HashSet<string>(Photos.Where((p,i)=>Card(i).Bottom>=0&&Card(i).Top<=Height).Select(p=>p.FilePath));foreach(var key in thumbs.Keys.Where(k=>!visible.Contains(k)).ToList()){thumbs[key].Dispose();thumbs.Remove(key);}}
             using (var font = Ui.Font(10))
             for(int i=0;i<Photos.Count;i++)
             {
@@ -100,6 +106,7 @@ namespace FrameSpool
         int pressedSlot=-1;
         Point pressedPoint;
         bool dragCancelled;
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public bool FitToWindow{get{return fitToWindow;}set{fitToWindow=value;RefreshScale();}}
         public event Action<PhotoItem> PhotoFocused;
         public event Action<int,string> PhotoDropped;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -17,7 +18,11 @@ namespace FrameSpool
         public List<RectangleF> Frames = new List<RectangleF>();
         public List<LayoutImage> Images = new List<LayoutImage>();
         public List<LayoutCaption> Captions = new List<LayoutCaption>();
+        public List<LayoutDecoration> Decorations = new List<LayoutDecoration>();
+        public List<LayoutLine> Lines = new List<LayoutLine>();
         public bool Info, Comments;
+        public bool Roll, RollHorizontal;
+        public float RollWidth, RollBleed;
         public string Overlay;
         public FrameDesign Design;
         public override string ToString() { return Name; }
@@ -33,15 +38,30 @@ namespace FrameSpool
         public int PhotoIndex;
         public string Role, Value, Family = "Arial", Alignment = "Left", VerticalAlignment = "Top";
         public float Points = 8;
+        public float Rotation;
+        public bool Vertical;
+        public Color Color = Color.Black;
+    }
+    public sealed class LayoutDecoration
+    {
+        public RectangleF Bounds;
+        public string Asset;
+        public float Rotation;
+    }
+    public sealed class LayoutLine
+    {
+        public List<PointF> Points = new List<PointF>();
+        public float Width = 1;
         public Color Color = Color.Black;
     }
     public sealed class PrintOptions
     {
-        public string Printer = "", Paper = "A4", PaperType = "Ultra Glossy", Source = "Sheet", Mode = "Photo";
-        public bool Borderless = true, PrintInfo, InfoFileName, ShowTime, ShowSeconds;
+        public string Printer = "", Paper = "A4", PaperType = "Printer Properties", Source = "", Mode = "Printer Properties";
+        public bool Borderless, PrintInfo, InfoFileName, ShowTime, ShowSeconds;
         public int Expansion = 1, MinimumImageSize = 60;
         public string DateFormat = "yyyy.MM.dd";
         public string DriverMode = "", DriverModePrinter = "", DriverModePaper = "";
+        public string DriverMedia="",DriverQuality="",DriverResolution="",DriverOptionsPrinter="";
         public bool DriverModeLandscape;
     }
     public sealed class PhotoPage
@@ -63,6 +83,15 @@ namespace FrameSpool
             var serializer = new JavaScriptSerializer { MaxJsonLength = 16000000 };
             foreach (var item in serializer.Deserialize<List<Dictionary<string, object>>>(json))
             {
+                if(item.ContainsKey("legacy_usd"))
+                {
+                    var roll = item["legacy_usd"] as Dictionary<string,object>;
+                    float width=Parse(Value(roll,"width")),bleed=Parse(Value(roll,"bleed"));
+                    var template=new PhotoLayout{Id=Value(item,"file"),Name=Value(roll,"title"),Paper=Value(roll,"paper"),Width=width,Height=width*1.5f,Roll=true,RollHorizontal=Value(roll,"direction")=="Horizontal",RollWidth=width,RollBleed=bleed};
+                    template.Frames.Add(new RectangleF(-bleed/width,-bleed/template.Height,1+2*bleed/width,1+2*bleed/template.Height));
+                    template.Images.Add(new LayoutImage{Id="roll-image",Group="roll-image",Direction="AutoLeft"});
+                    Catalog.Add(template);continue;
+                }
                 if (!item.ContainsKey("metadata") || !item.ContainsKey("css")) continue;
                 var meta = item["metadata"] as Dictionary<string, object>;
                 if (meta == null || !meta.ContainsKey("PaperSize")) continue;
@@ -94,11 +123,25 @@ namespace FrameSpool
                 if (layout.Frames.Count == 0)
                     foreach(var bounds in containers.Values) layout.Frames.Add(Normalize(bounds,layout));
                 if (layout.Frames.Count == 0) continue;
+                foreach(var obj in Objects(item,"decoration_objects"))
+                {
+                    RectangleF bounds;
+                    if(containers.TryGetValue(Value(obj,"container"),out bounds))
+                        layout.Decorations.Add(new LayoutDecoration{Bounds=Normalize(bounds,layout),Asset=Value(obj,"asset"),Rotation=Parse(Value(obj,"rotation"))});
+                }
                 foreach(var obj in Objects(item,"text_objects"))
                 {
                     string role=Value(obj,"role");
-                    if(role!="info" && role!="comment") continue;
                     var parameters=obj["params"] as Dictionary<string,object> ?? new Dictionary<string,object>();
+                    if(Value(obj,"type")=="application/x-pif-line+xml")
+                    {
+                        var line=new LayoutLine{Width=Math.Max(.1f,Parse(Value(parameters,"LineWidth"))),Color=ParseColor(Value(parameters,"Color"))};
+                        var coordinates=Value(parameters,"PointList").Split(',');
+                        for(int p=0;p+1<coordinates.Length;p+=2)line.Points.Add(new PointF((ml+Parse(coordinates[p]))/layout.Width,(mt+Parse(coordinates[p+1]))/layout.Height));
+                        if(line.Points.Count>=2)layout.Lines.Add(line);continue;
+                    }
+                    if(role=="unknown" && Value(obj,"caption_value").Contains("%E"))role="exif";
+                    if(role!="info" && role!="comment" && role!="exif") continue;
                     string target=Value(parameters,"Target").TrimStart('#');
                     int position=layout.Images.FindIndex(x=>x.Id==target);
                     if(position<0)continue;
@@ -108,12 +151,16 @@ namespace FrameSpool
                     float ox=ml,oy=mt; RectangleF parent;
                     if(containers.TryGetValue(Value(obj,"container"),out parent)){ox=parent.X;oy=parent.Y;}
                     var caption=new LayoutCaption{Role=role,PhotoIndex=position,Value=Value(obj,"caption_value"),Alignment=Value(parameters,"TextAlign"),VerticalAlignment=Value(parameters,"VerticalAlign"),Bounds=Normalize(new RectangleF(ox+Property(rule,"left"),oy+Property(rule,"top"),Property(rule,"width"),Property(rule,"height")),layout)};
+                    caption.Rotation=Parse(Value(parameters,"StrDirection"));
+                    caption.Vertical=Value(parameters,"ScriptDirection")=="Vertical";
+                    string family=Regex.Match(rule,@"font-family\s*:\s*[""']?([^;""',]+)").Groups[1].Value;
+                    if(!String.IsNullOrWhiteSpace(family))caption.Family=family.Trim();
                     float points=Parse(Regex.Match(rule,@"font-size\s*:\s*([\d.]+)pt").Groups[1].Value);if(points>0)caption.Points=points;
                     var rgb=Regex.Match(rule,@"color\s*:\s*rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)");
                     if(rgb.Success)caption.Color=Color.FromArgb(Int32.Parse(rgb.Groups[1].Value),Int32.Parse(rgb.Groups[2].Value),Int32.Parse(rgb.Groups[3].Value));
                     layout.Captions.Add(caption);
                 }
-                layout.Info = layout.Captions.Any(c=>c.Role=="info");
+                layout.Info = layout.Captions.Any(c=>c.Role=="info"||c.Role=="exif");
                 layout.Comments = layout.Captions.Any(c=>c.Role=="comment");
                 Catalog.Add(layout);
             }
@@ -121,6 +168,7 @@ namespace FrameSpool
         static IEnumerable<Dictionary<string,object>> Objects(Dictionary<string,object> item,string key)
         { object value; if(!item.TryGetValue(key,out value))yield break;var list=value as System.Collections.IEnumerable;if(list==null)yield break;foreach(var obj in list){var dict=obj as Dictionary<string,object>;if(dict!=null)yield return dict;} }
         static string Value(Dictionary<string,object> obj,string key){object value;return obj.TryGetValue(key,out value)?Convert.ToString(value):"";}
+        static Color ParseColor(string value){var parts=value.Split(',');if(parts.Length<3)return Color.Black;return Color.FromArgb(Math.Max(0,Math.Min(255,(int)Parse(parts[0]))),Math.Max(0,Math.Min(255,(int)Parse(parts[1]))),Math.Max(0,Math.Min(255,(int)Parse(parts[2]))));}
         static RectangleF Normalize(RectangleF bounds,PhotoLayout layout){return new RectangleF(bounds.X/layout.Width,bounds.Y/layout.Height,bounds.Width/layout.Width,bounds.Height/layout.Height);}
         static float Parse(string s) { float n; return float.TryParse(s, NumberStyles.Float, Invariant, out n) ? n : 0; }
         static float Property(string css, string name) { return Parse(Regex.Match(css, @"(?:^|[;\s])" + Regex.Escape(name) + @"\s*:\s*([\d.-]+)px").Groups[1].Value); }
@@ -128,6 +176,25 @@ namespace FrameSpool
         {
             return Catalog.Where(l => l.Paper == paper).OrderBy(l => l.Frames.Count).ThenBy(l => l.Name.StartsWith("Borderless") ? 0 : 1).ThenBy(l => l.Name).ToList();
         }
+        // Roll definitions encode the printable width and requested photo direction,
+        // with length zero meaning that the photo determines the paper length.
+        public static PhotoLayout ResolveForPhotos(PhotoLayout layout,IEnumerable<PhotoItem> photos)
+        {
+            var photo=photos==null?null:photos.FirstOrDefault(p=>p!=null&&p.Copies>0);
+            return ResolveRoll(layout,photo);
+        }
+        static PhotoLayout ResolveRoll(PhotoLayout layout,PhotoItem photo)
+        {
+            if(layout==null||!layout.Roll)return layout;
+            float ratio=photo==null?1.5f:(float)Math.Max(photo.Width,photo.Height)/Math.Max(1,Math.Min(photo.Width,photo.Height));
+            if(layout.RollHorizontal)ratio=1/ratio;
+            float height=Math.Max(360,Math.Min(30000,layout.RollWidth*ratio));
+            var result=new PhotoLayout{Id=layout.Id,Name=layout.Name,Paper=layout.Paper,Width=layout.RollWidth,Height=height,Roll=true,RollHorizontal=layout.RollHorizontal,RollWidth=layout.RollWidth,RollBleed=layout.RollBleed};
+            result.Frames.Add(new RectangleF(-layout.RollBleed/result.Width,-layout.RollBleed/height,1+2*layout.RollBleed/result.Width,1+2*layout.RollBleed/height));
+            result.Images.AddRange(layout.Images);return result;
+        }
+        public static PhotoLayout ResolveForPage(PhotoLayout layout,PhotoPage page)
+        {return ResolveRoll(layout,page==null?null:page.Photos.FirstOrDefault(p=>p!=null));}
         public static List<PhotoPage> Paginate(IEnumerable<PhotoItem> photos, PhotoLayout layout)
         {
             var pages = new List<PhotoPage>();
@@ -158,7 +225,7 @@ namespace FrameSpool
         }
         public static void DrawPage(Graphics g, RectangleF page, PhotoLayout layout, PhotoPage content, PrintOptions options, bool corrected, PhotoItem focus)
         {
-            if(layout.Design!=null){layout.Design.Draw(g,page,content,corrected,focus,false);return;}
+            if(layout.Design!=null){layout.Design.Draw(g,page,content,corrected,focus,false,options);return;}
             g.FillRectangle(Brushes.White, page);
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             for (int i = 0; i < layout.Frames.Count; i++)
@@ -205,21 +272,73 @@ namespace FrameSpool
             {
                 if(content==null || caption.PhotoIndex>=content.Photos.Count)continue;
                 var photo=content.Photos[caption.PhotoIndex];if(photo==null)continue;
-                if(caption.Role=="info"&&!options.PrintInfo)continue;
-                string text=caption.Role=="comment"?photo.Comment:options.InfoFileName?photo.FileName:photo.CaptureDate.ToString(options.DateFormat+(options.ShowTime?(options.ShowSeconds?" HH:mm:ss":" HH:mm"):""));
+                if((caption.Role=="info"||caption.Role=="exif")&&!options.PrintInfo)continue;
+                string text=CaptionText(caption.Role,caption.Value,photo,options);
                 if(String.IsNullOrEmpty(text))continue;
                 var r=caption.Bounds;var box=new RectangleF(page.X+r.X*page.Width,page.Y+r.Y*page.Height,r.Width*page.Width,r.Height*page.Height);
-                using(var font=new Font(caption.Family,Math.Max(.5f,caption.Points*5*page.Width/layout.Width),FontStyle.Regular,GraphicsUnit.Pixel))
+                DrawCaption(g,box,text,caption,page.Width/layout.Width);
+            }
+            foreach(var line in layout.Lines)
+                using(var pen=new Pen(line.Color,Math.Max(.1f,line.Width*page.Width/layout.Width)))
+                    g.DrawLines(pen,line.Points.Select(p=>new PointF(page.X+p.X*page.Width,page.Y+p.Y*page.Height)).ToArray());
+            foreach(var decoration in layout.Decorations)
+            {
+                if(!AppAssets.Contains(decoration.Asset))continue;
+                var r=decoration.Bounds;var box=new RectangleF(page.X+r.X*page.Width,page.Y+r.Y*page.Height,r.Width*page.Width,r.Height*page.Height);
+                var state=g.Save();
+                try
+                {
+                    if(decoration.Rotation!=0){g.TranslateTransform(box.X+box.Width/2,box.Y+box.Height/2);g.RotateTransform(decoration.Rotation);g.TranslateTransform(-box.X-box.Width/2,-box.Y-box.Height/2);}
+                    using(var stream=AppAssets.Open(decoration.Asset))using(var image=Image.FromStream(stream))using(var attributes=new ImageAttributes())
+                    {attributes.SetWrapMode(WrapMode.TileFlipXY);g.DrawImage(image,new[]{new PointF(box.Left,box.Top),new PointF(box.Right,box.Top),new PointF(box.Left,box.Bottom)},new RectangleF(0,0,image.Width,image.Height),GraphicsUnit.Pixel,attributes);}
+                }
+                finally{g.Restore(state);}
+            }
+            if (!String.IsNullOrEmpty(layout.Overlay) && File.Exists(layout.Overlay)) using (var overlay = Image.FromFile(layout.Overlay)) g.DrawImage(overlay, page);
+        }
+        internal static string CaptionText(string role,string value,PhotoItem photo,PrintOptions options)
+        {
+            if(photo==null)return "";
+            if(role=="comment")return photo.Comment;
+            if(role=="exif")
+            {
+                string result=String.IsNullOrEmpty(value)?"%E %U %I %C":value;
+                foreach(var token in new[]{new[]{"%E","EXP Time"},new[]{"%U","F Number"},new[]{"%I","ISO Sensitivity"},new[]{"%C","Camera"}})
+                {string text;if(photo.Metadata==null||!photo.Metadata.TryGetValue(token[1],out text)||String.IsNullOrWhiteSpace(text)||text=="-")text="";result=result.Replace(token[0],text);}
+                return Regex.Replace(result,@"\s+"," ").Trim();
+            }
+            if(options.InfoFileName)return photo.FileName;
+            try{return photo.CaptureDate.ToString(options.DateFormat+(options.ShowTime?(options.ShowSeconds?" HH:mm:ss":" HH:mm"):""));}
+            catch(FormatException){return photo.CaptureDate.ToString("yyyy.MM.dd");}
+        }
+        internal static void DrawCaption(Graphics graphics,RectangleF box,string text,LayoutCaption caption,float pageScale)
+        {
+            if(box.Width<=0||box.Height<=0||String.IsNullOrEmpty(text))return;
+            var state=graphics.Save();
+            try
+            {
+                graphics.SetClip(box,CombineMode.Intersect);
+                if(caption.Rotation!=0){graphics.TranslateTransform(box.X+box.Width/2,box.Y+box.Height/2);graphics.RotateTransform(caption.Rotation);graphics.TranslateTransform(-box.X-box.Width/2,-box.Y-box.Height/2);}
+                using(var font=CaptionFont(caption.Family,Math.Max(.5f,caption.Points*5*pageScale)))
                 using(var brush=new SolidBrush(caption.Color))
                 using(var format=new StringFormat(StringFormat.GenericTypographic))
                 {
                     format.Alignment=caption.Alignment=="Right"?StringAlignment.Far:caption.Alignment=="Center"?StringAlignment.Center:StringAlignment.Near;
                     format.LineAlignment=caption.VerticalAlignment=="Bottom"?StringAlignment.Far:caption.VerticalAlignment=="Center"?StringAlignment.Center:StringAlignment.Near;
                     format.Trimming=StringTrimming.EllipsisCharacter;
-                    g.DrawString(text,font,brush,box,format);
+                    if(caption.Vertical)format.FormatFlags|=StringFormatFlags.DirectionVertical;
+                    graphics.DrawString(text,font,brush,box,format);
                 }
             }
-            if (!String.IsNullOrEmpty(layout.Overlay) && File.Exists(layout.Overlay)) using (var overlay = Image.FromFile(layout.Overlay)) g.DrawImage(overlay, page);
+            finally{graphics.Restore(state);}
+        }
+        static Font CaptionFont(string family,float pixels)
+        {
+            // Preserve the declared face when installed. The shipped generic Gothic
+            // alias has no Windows font mapping in the template; Arial is a stable
+            // western fallback rather than silently accepting GDI+'s default face.
+            try{using(var face=new FontFamily(family))return new Font(face,pixels,FontStyle.Regular,GraphicsUnit.Pixel);}
+            catch(ArgumentException){return new Font("Arial",pixels,FontStyle.Regular,GraphicsUnit.Pixel);}
         }
         public static Bitmap RenderPage(PhotoLayout layout, PhotoPage content, PrintOptions options, int dpi, bool corrected)
         {

@@ -8,9 +8,13 @@ namespace FrameSpool
     // These conversions alone do not reproduce PhotoEnhance, APF, PIM or ICC.
     public static class FixedPointColorMath
     {
+        public static byte Luminance(byte red, byte green, byte blue)
+        {
+            return (byte)((313525 * red + 615512 * green + 119538 * blue) >> 20);
+        }
         public static byte[] ToYcc(Color rgb)
         {
-            int y=(313525*rgb.R+615512*rgb.G+119538*rgb.B)>>20;
+            int y=Luminance(rgb.R, rgb.G, rgb.B);
             int cb=(-176936*rgb.R-347351*rgb.G+524286*rgb.B)>>20;
             int cr=(524286*rgb.R-439028*rgb.G-85259*rgb.B)>>20;
             return new byte[]{(byte)Clamp(y,0,255),(byte)(Clamp(cb,-128,127)+128),(byte)(Clamp(cr,-128,127)+128)};

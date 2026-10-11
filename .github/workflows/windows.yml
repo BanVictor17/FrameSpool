@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     defaults:
       run:
         shell: powershell
@@ -21,22 +21,37 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Build portable executable
-        run: .\build.ps1
+      - name: Prepare pinned build tools
+        run: .\setup-build-tools.ps1
+      - name: Build self-contained EXE and MSI
+        run: .\build.ps1 -Installer
       - name: Verify standalone executable
         run: .\verify.ps1
+      - name: Verify MSI installation, upgrade and uninstall
+        run: |
+          .\build-msi.ps1 -Version 0.1.9
+          .\verify-installer.ps1 -PreviousMsiPath .\dist\release\FrameSpool-0.1.9-win-x64.msi
+      - name: Package release assets
+        run: .\package-release.ps1
       - name: Upload application and notices
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: FrameSpool-Windows
-          path: dist/FrameSpool/
+          path: |
+            dist/release/FrameSpool-0.2.0-win-x64.exe
+            dist/release/FrameSpool-0.2.0-win-x64.msi
+            dist/release/FrameSpool-0.2.0-win-x64-portable.zip
+            dist/release/LibRaw-0.22.2-source.zip
+            dist/release/SHA256SUMS.txt
           if-no-files-found: error
       - name: Upload verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: FrameSpool-verification
-          path: obj/verification/
+          path: |
+            obj/verification/
+            obj/verification-msi/
           if-no-files-found: ignore
 
   release:
@@ -62,6 +77,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          Compress-Archive -Path .\release\* -DestinationPath .\FrameSpool-Windows.zip
-          gh release create $env:GITHUB_REF_NAME .\FrameSpool-Windows.zip --verify-tag --title ("FrameSpool " + $env:GITHUB_REF_NAME + " preview") --notes-file .\source\RELEASE_NOTES.md --prerelease
+          gh release create $env:GITHUB_REF_NAME .\release\FrameSpool-0.2.0-win-x64.exe .\release\FrameSpool-0.2.0-win-x64.msi .\release\FrameSpool-0.2.0-win-x64-portable.zip .\release\LibRaw-0.22.2-source.zip .\release\SHA256SUMS.txt --verify-tag --title ("FrameSpool " + $env:GITHUB_REF_NAME + " preview") --notes-file .\source\RELEASE_NOTES.md --prerelease
           if ($LASTEXITCODE -ne 0) { throw 'Preview publication failed.' }

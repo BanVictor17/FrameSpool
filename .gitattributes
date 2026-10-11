@@ -7,4 +7,6 @@
 *.bmp binary
 *.png binary
 *.ico binary
+*.exe binary
+*.zip binary
 assets/** binary

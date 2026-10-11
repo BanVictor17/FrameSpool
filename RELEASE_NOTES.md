@@ -1,16 +1,16 @@
-FrameSpool 0.1.0 is an early Windows preview for photo layouts, cropping,
-corrections, editable frames and printing through installed Windows drivers.
+FrameSpool 0.2.0 expands the standalone photo-printing preview.
 
-The executable includes its built-in artwork and 135 layouts. It opens without
-a printer and runs without a companion assets folder. Windows with .NET Framework
-4.8 or later is required; physical printing requires the appropriate printer driver.
+Downloads:
+- Portable EXE: one self-contained Windows 10/11 x64 executable, including .NET, artwork, layouts, RAW decoder, licenses and decoder source.
+- MSI: per-user install, Start menu shortcut, upgrade and uninstall support. No separate runtime prerequisite.
+- Portable ZIP: the same app with documentation and notices. SHA256SUMS.txt verifies downloads.
 
-79 local checks passed, including execution from a folder containing only the EXE.
-The Windows PDF printing path was also verified. Physical L8050 output remains
-untested, and complete reference equivalence is not claimed.
+Added camera RAW development, exposure/white balance, RGB histogram, embedded RGB ICC conversion to sRGB, 143 layouts including eight roll formats, original oval masks, crop marks, EXIF/rotated captions, EPPIF 3.1 template import and portable .fspframe packages.
 
-RAW development, legacy PIF/USD/EFF formats, exact enhancement algorithms and
-some interface behavior still need work. See ROADMAP.md for the full list.
+Browsing includes shell folder icons, keyboard shortcuts, saved preferences, cancellable batches and exports. Quick Print A/B supports desktop shortcuts and dropped photos/folders. Zero page copies skips output. Media/quality/resolution/borderless controls use the installed Windows driver's capabilities; Properties retains additional device-specific settings.
 
-The new code is MIT licensed. Third-party artwork has separate ownership and
-permission status; see ASSET_NOTICES.md. Keep these notices with redistribution.
+The portable app and MSI are verified automatically with synthetic RAW/ICC/layout/workflow fixtures and Windows driver round trips. MSI verification exercises install, major upgrade and uninstall.
+
+Physical L8050 output and complete reference equivalence remain untested. PRINT Image Matching, exact proprietary correction algorithms, old/multipage PIF and arbitrary colored EFF remain unavailable. See ROADMAP.md.
+
+New code is MIT licensed. Third-party artwork, .NET and LibRaw have separate terms and notices, embedded and included with distributions. Releases are unsigned previews.
