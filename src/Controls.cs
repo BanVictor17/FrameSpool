@@ -109,7 +109,7 @@ namespace FrameSpool
         protected override void OnKeyDown(KeyEventArgs e) { base.OnKeyDown(e); if(FocusPhoto==null)return; if(e.KeyCode==Keys.Add||e.KeyCode==Keys.Oemplus)FocusPhoto.Copies=Math.Min(99,FocusPhoto.Copies+1); else if(e.KeyCode==Keys.Subtract||e.KeyCode==Keys.OemMinus)FocusPhoto.Copies=Math.Max(0,FocusPhoto.Copies-1); else if(e.KeyCode==Keys.Enter&&PhotoEnlarged!=null)PhotoEnlarged(FocusPhoto); if(CopiesChanged!=null)CopiesChanged(FocusPhoto); Invalidate(); }
         protected override void Dispose(bool disposing) { if(disposing){closed=true;foreach(var image in thumbs.Values)image.Dispose();thumbs.Clear();if(ContextMenuStrip!=null){ContextMenuStrip.Dispose();ContextMenuStrip=null;}} base.Dispose(disposing); }
     }
-    public class PagePreview : ScrollableControl
+    public partial class PagePreview : ScrollableControl
     {
         public PhotoLayout LayoutDefinition;
         public PhotoPage Page;
@@ -136,7 +136,7 @@ namespace FrameSpool
         {
             DoubleBuffered=true; SetStyle(ControlStyles.ResizeRedraw,true);
             BackColor=Color.FromArgb(235,236,238);AllowDrop=true;AutoScroll=true;
-            renderer.Changed+=delegate{if(!IsDisposed)Invalidate();};
+            renderer.Changed+=PreviewChanged;
             slotMenu.Items.Add("Clear Settings",null,delegate{if(EnableManual&&Page!=null&&contextSlot>=0&&contextSlot<Page.Photos.Count&&SlotCleared!=null)SlotCleared(contextSlot);});
         }
         public void RefreshScale()
@@ -147,14 +147,7 @@ namespace FrameSpool
         protected override void OnResize(EventArgs e){base.OnResize(e);if(renderer!=null)QueueRender();}
         void QueueRender()
         {
-            if(LayoutDefinition==null||IsDisposed)return;
-            var layout=LayoutDefinition;
-            var page=Page==null?null:new PhotoPage{Copies=Page.Copies,Photos=Page.Photos.Select(p=>p==null?null:p.Clone()).ToList()};
-            var options=new PrintOptions();if(Options!=null)foreach(var field in typeof(PrintOptions).GetFields())field.SetValue(options,field.GetValue(Options));
-            bool corrected=Corrected;var sheet=Sheet;
-            int dpi=(int)Math.Ceiling(Math.Min(144,Math.Max(24,Math.Max(sheet.Width*360/layout.Width,sheet.Height*360/layout.Height))));
-            bool clear=renderedPage!=Page||renderedLayout!=layout;renderedPage=Page;renderedLayout=layout;
-            renderer.Request(()=>FrameSpool.LayoutEngine.RenderPage(layout,page,options,dpi,corrected),clear);
+            RequestPagePreview();
         }
         public RectangleF Sheet { get { if(LayoutDefinition==null)return RectangleF.Empty;if(fitToWindow)return FrameSpool.LayoutEngine.PaperBounds(new RectangleF(12,10,Math.Max(1,ClientSize.Width-24),Math.Max(1,ClientSize.Height-22)),LayoutDefinition);float w=LayoutDefinition.Width*96*Ui.Scale(this)/360,h=LayoutDefinition.Height*96*Ui.Scale(this)/360;return new RectangleF(Math.Max(12,(ClientSize.Width-w)/2)+AutoScrollPosition.X,Math.Max(10,(ClientSize.Height-h)/2)+AutoScrollPosition.Y,w,h); } }
         protected override void OnPaint(PaintEventArgs e)
@@ -162,8 +155,8 @@ namespace FrameSpool
             base.OnPaint(e);if(LayoutDefinition==null)return;var sheet=Sheet;
             e.Graphics.FillRectangle(Brushes.Gray,sheet.X+3,sheet.Y+3,sheet.Width,sheet.Height);e.Graphics.FillRectangle(Brushes.White,sheet);
             if(renderer.Image!=null)e.Graphics.DrawImage(renderer.Image,sheet);
-            else TextRenderer.DrawText(e.Graphics,renderer.Error==null?"Loading preview...":"Preview unavailable: "+renderer.Error,Font,Rectangle.Round(sheet),Color.DimGray,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.WordBreak);
-            if(Page!=null)for(int i=0;i<LayoutDefinition.Frames.Count&&i<Page.Photos.Count;i++)if(Page.Photos[i]!=null&&Page.Photos[i]==FocusPhoto)
+            if(renderer.Error!=null)TextRenderer.DrawText(e.Graphics,"Preview unavailable: "+renderer.Error,Font,Rectangle.Round(sheet),Color.DimGray,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.WordBreak);
+            if(CurrentPreviewDisplayed&&Page!=null)for(int i=0;i<LayoutDefinition.Frames.Count&&i<Page.Photos.Count;i++)if(Page.Photos[i]!=null&&Page.Photos[i]==FocusPhoto)
             {using(var path=SlotPath(i))using(var pen=new Pen(Color.RoyalBlue,2))e.Graphics.DrawPath(pen,path);}
         }
         RectangleF SlotBounds(int i){var sheet=Sheet;var f=LayoutDefinition.Frames[i];return new RectangleF(sheet.X+f.X*sheet.Width,sheet.Y+f.Y*sheet.Height,f.Width*sheet.Width,f.Height*sheet.Height);}
@@ -208,6 +201,6 @@ namespace FrameSpool
             if(e.Effect==DragDropEffects.Move){if(PhotoMoved!=null)PhotoMoved((int)e.Data.GetData("FrameSpool.Slot"),i);return;}
             string path=e.Data.GetDataPresent(DataFormats.FileDrop)?((string[])e.Data.GetData(DataFormats.FileDrop))[0]:(string)e.Data.GetData(DataFormats.Text);if(PhotoDropped!=null)PhotoDropped(i,path);
         }
-        protected override void Dispose(bool disposing){if(disposing){renderer.Dispose();slotMenu.Dispose();}base.Dispose(disposing);}
+        protected override void Dispose(bool disposing){if(disposing){DisposeCache();renderer.Dispose();slotMenu.Dispose();}base.Dispose(disposing);}
     }
 }

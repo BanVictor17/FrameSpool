@@ -1,14 +1,12 @@
-FrameSpool 0.2.2 fixes printer configuration and laptop scaling, and adds GitHub updates.
+FrameSpool 0.2.3 improves photo positioning and next/previous navigation.
 
-- Fixes the false “printer rejected this combination” error: successfully resolved driver settings are accepted. Properties stays accessible when saved choices are obsolete.
-- Saves accepted media, quality, resolution, source and private driver settings immediately when settings or the print dialog are accepted. Future jobs restore the native configuration without stale overrides, including after a failed job.
-- Scales fonts, controls, artwork, thumbnails and layout lists at Windows 125%, 150% and 200% scaling, and adapts when moving between monitors. Smaller displays can scroll the workspace.
-- Adds Help > Check for Updates and an About button. Stable GitHub downloads are verified against their SHA256 digests before updating and restarting. Portable copies are replaced atomically with rollback; installed copies upgrade through MSI, retaining their install directory.
+- Positioning opens inside the app over the left sidebar, beside the preview, rather than beyond the right edge. Its location is kept within the monitor's working area.
+- Trim, Fit and a 50–200% magnification slider are always available beneath the page arrows. They synchronize immediately with the selected photo and the Positioning palette when open. Empty slots disable the controls.
+- Adjacent pages are pre-rendered and cached for immediate normal next/previous navigation. Cold pages render in the background without clearing the existing preview or flashing “Loading preview”. Crops, captions, corrections, layout changes and source-file changes invalidate old snapshots.
+- Preview storage is bounded to eight entries and 64 MiB. Closed windows and stale renders release their images safely.
 
-Download the portable EXE for a single self-contained Windows 10/11 x64 app, or the MSI for a per-user installation with Start menu shortcut and uninstall support. The ZIP includes documentation and notices. Existing v0.2.1 users must download v0.2.2 manually to get the updater.
+Includes the v0.2.2 fixes for accepted printer settings, native driver persistence, DPI scaling and GitHub updates. Existing v0.2.2 users can choose Help > Check for Updates, then download/install and restart. Current photo selections close during updates; preferences and frames are retained.
 
-Preferences and frames survive updates. Restarting closes the current photo selection. Updates are requested manually and require internet access and a writable app folder. The app runs offline otherwise.
+Downloads: a single self-contained Windows 10/11 x64 portable EXE, per-user MSI installer, portable ZIP with documentation/notices, decoder source and SHA256 checksums. No separate .NET runtime is needed.
 
-Verification covers synthetic RAW/ICC/layout/workflow fixtures, Windows printer setting round trips, four DPI scales, download cancellation/corruption and rollback, actual portable helper replacement, MSI install/helper upgrade/uninstall, and Microsoft Print to PDF output.
-
-Physical L8050 output still needs testing with the updated app. Complete original-app output equivalence, PRINT Image Matching, exact proprietary correction algorithms and some old template formats remain unverified or unavailable; see ROADMAP.md. New code is MIT; redistributed artwork and dependencies have separate notices. This is a regular release; binaries are unsigned.
+Verification covers positioning synchronization, palette placement, immediate cached navigation, crop/source invalidation, cache bounds, DPI layouts, RAW/ICC/layout/driver/workflow fixtures, portable replacement and MSI upgrade/uninstall. Physical L8050 output and full original-app equivalence remain unverified; see ROADMAP.md. New code is MIT; artwork and dependencies retain their separate notices. This is a regular release; binaries are unsigned.

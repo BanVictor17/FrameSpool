@@ -20,18 +20,25 @@ namespace FrameSpool
         Func<Bitmap> pending;
         int version;
         bool busy;
+        bool immediatePending;
         volatile bool disposed;
         public Bitmap Image { get; private set; }
         public string Error { get; private set; }
         public bool Ready { get { return !busy && pending == null && !timer.Enabled; } }
         public event Action Changed;
         public PreviewRenderer() { timer.Tick += delegate { timer.Stop(); Render(); }; }
-        public void Request(Func<Bitmap> render, bool clear = false)
+        public void Request(Func<Bitmap> render, bool clear = false,bool immediate=false)
         {
             if (disposed) return;
-            version++; pending = render; Error = null;
+            version++; pending = render; immediatePending=immediate;Error = null;
             if (clear && Image != null) { Image.Dispose(); Image = null; }
-            timer.Stop(); timer.Start();
+            timer.Stop();if(immediate)Render();else timer.Start();
+        }
+        public void Display(Bitmap image)
+        {
+            if(disposed){image.Dispose();return;}
+            version++;pending=null;timer.Stop();Error=null;
+            var previous=Image;Image=image;previous?.Dispose();Changed?.Invoke();
         }
         public static async Task<Bitmap> Decode(Func<Bitmap> render)
         {
@@ -52,7 +59,7 @@ namespace FrameSpool
                 if (Image != null) Image.Dispose(); Image = result; Error = error;
                 if (Changed != null) Changed();
             }
-            if (!disposed && pending != null) { timer.Stop(); timer.Start(); }
+            if (!disposed && pending != null) { timer.Stop();if(immediatePending)Render();else timer.Start(); }
         }
         public void Dispose()
         {

@@ -1,6 +1,6 @@
 # FrameSpool roadmap
 
-Version 0.2.2 accepts driver-resolved print combinations, immediately persists accepted native print settings, scales the interface for high-DPI displays and adds checksum-verified GitHub updates for portable and installed copies. It includes bundled RAW development and .NET runtime, ICC-to-sRGB conversion, 143 layouts including roll paper, oval masks, crop marks, captions, legacy template import, portable frame packages, Quick Print workflows, driver controls and an MSI. Complete behavioral/output equivalence with the reference application remains unverified.
+Version 0.2.3 adds inline Trim/Fit/magnification controls synchronized with the Positioning palette, a palette location beside the preview and cached adjacent-page navigation. Driver settings persist, the interface scales for high-DPI displays and GitHub updates support portable and installed copies. It includes bundled RAW development and .NET runtime, ICC-to-sRGB conversion, 143 layouts including roll paper, oval masks, crop marks, captions, legacy template import, portable frame packages, Quick Print workflows, driver controls and an MSI. Complete behavioral/output equivalence with the reference application remains unverified.
 
 ## Remaining work
 
@@ -13,6 +13,6 @@ Version 0.2.2 accepts driver-resolved print combinations, immediately persists a
 
 Synthetic photographs, Bayer DNG and ICC profiles test source preservation, RAW development/color/orientation, fixed-point arithmetic, layout/render geometry, crops, masks/captions/frames, workflow cancellation/preferences/shortcuts and actual Windows driver ticket/DEVMODE transport. The EXE is tested alone in an empty directory. MSI verification covers installation, upgrade and uninstall.
 
-Tests validate this implementation; they do not establish a complete 1:1 comparison. Version 0.2.2 is a regular release; the hardware and reference-output checks above remain outstanding.
+Tests validate this implementation; they do not establish a complete 1:1 comparison. Version 0.2.3 is a regular release; the hardware and reference-output checks above remain outstanding.
 
 New source uses MIT. Asset ownership/redistribution permission and dependency terms are separate in ASSET_NOTICES.md and THIRD_PARTY_NOTICES.md.

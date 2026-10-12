@@ -256,6 +256,7 @@ namespace FrameSpool
                 LegacyFormatVerification.Run(directory,checks);
                 PhotoDecodingVerification.Run(directory,(name,passed)=>Check(checks,name,passed));
                 MainForm.VerifyVisuals(directory,fixture,checks);
+                MainForm.VerifyNavigation(directory,fixture,checks);
                 MainForm.VerifyWorkflows(directory,fixture,checks);
                 DriverVerification.Run(directory,checks);
                 UpdateVerification.Run(directory,checks);

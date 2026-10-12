@@ -194,6 +194,7 @@ namespace FrameSpool
                 rotateAll.Enabled = CurrentPositionPhotos().Count != 0;
                 syncing = false;
             };
+            syncPositioningPalette=sync;
             Action refresh = delegate { UpdatePage(); sync(); };
             Action commitZoom = delegate
             {
@@ -218,9 +219,9 @@ namespace FrameSpool
                 if (!syncing && FocusPhoto != null) { FocusPhoto.Zoom = zoom.Value / 100f; syncing = true; value.Text = zoom.Value.ToString(); syncing = false; UpdatePage(); }
             };
             Button trim = Ui.Button(dialog, "Trim", 12, 94, 90, 27, delegate
-            { if (FocusPhoto != null) { FocusPhoto.Fit = false; FocusPhoto.Zoom = 1f; FocusPhoto.OffsetX = FocusPhoto.OffsetY = 0; refresh(); } });
+            { if (FocusPhoto != null) { SetPhotoFit(false); sync(); } });
             Button fit = Ui.Button(dialog, "Fit", 122, 94, 90, 27, delegate
-            { if (FocusPhoto != null) { FocusPhoto.Fit = true; FocusPhoto.Zoom = 1f; FocusPhoto.OffsetX = FocusPhoto.OffsetY = 0; refresh(); } });
+            { if (FocusPhoto != null) { SetPhotoFit(true); sync(); } });
             photoControls.Add(trim); photoControls.Add(fit);
             Ui.Label(dialog, "Move Photo", 25, 129, 185, 16);
             Action<int, int> move = delegate(int x, int y)
@@ -252,17 +253,16 @@ namespace FrameSpool
             timer.Tick += delegate
             {
                 if (!printingScreen) { dialog.Close(); return; }
-                if (observedPage != pageIndex) { observedPage = pageIndex; Focus(CurrentPositionPhotos().FirstOrDefault()); }
+                if (observedPage != pageIndex) observedPage = pageIndex;
                 if (observed != FocusPhoto) { observed = FocusPhoto; syncing = true; value.Text = FocusPhoto == null ? "" : ((int)Math.Round(FocusPhoto.Zoom * 100)).ToString(); syncing = false; }
                 undoAll.Enabled = CurrentPositionPhotos().Count != 0;
                 sync();
             };
-            dialog.FormClosed += delegate { timer.Stop(); timer.Dispose(); positioningPalette = null; };
+            dialog.FormClosed += delegate { timer.Stop(); timer.Dispose(); positioningPalette = null;syncPositioningPalette=null; };
             syncing = true; value.Text = ((int)Math.Round(FocusPhoto.Zoom * 100)).ToString(); syncing = false;
             sync(); timer.Start();
-            dialog.StartPosition = FormStartPosition.Manual;
-            Rectangle working = Screen.FromControl(this).WorkingArea;
-            dialog.Location = new Point(Math.Min(Right + 4, working.Right - dialog.Width), Math.Max(working.Top, Top + 50));
+            dialog.StartPosition = FormStartPosition.CenterParent;
+            dialog.Shown+=delegate{var owner=RectangleToScreen(ClientRectangle);var working=Screen.FromControl(this).WorkingArea;dialog.Location=PositioningLocation(owner,dialog.Size,working,menu.Height+Pixels(12));};
             dialog.Show(this);
         }
 
