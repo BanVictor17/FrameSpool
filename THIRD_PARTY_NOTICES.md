@@ -6,6 +6,8 @@ The portable executable includes the Microsoft .NET 10 Windows Desktop runtime, 
 
 LibRaw 0.22.2 is redistributed under CDDL 1.0. Its unmodified source archive, COPYRIGHT, additional notices, CDDL terms and build instructions are included in third_party/LibRaw. Static GCC libraries use the GCC Runtime Library Exception; MinGW-w64/UCRT and winpthreads notices are included. This does not relicense LibRaw as MIT.
 
-The executable embeds these license texts and the LibRaw source archive. Use Help > About > Licenses to read the notices or save the decoder's corresponding source. The repository and release source archive also provide them. Portable ZIP and MSI distributions include these notices as files.
+LittleCMS 2.19.1 is redistributed under MIT, Copyright (c) 2023 Marti Maria Saguer. Its unmodified source archive, license and build instructions are included in third_party/LittleCMS. It converts embedded RGB ICC profiles into sRGB independently of Windows ICM. Its DLL uses the same MinGW/UCRT toolchain notices described above.
+
+The executable embeds these license texts and the LibRaw and LittleCMS source archives. Use Help > About > Licenses to read the notices or save the corresponding sources. The repository also provides them. Portable ZIP and MSI distributions include these notices and sources as files.
 
 No reference application's executables, DLLs or printer SDK are bundled. Build tools (.NET SDK and WiX) are downloaded for compilation and are not included in the app.

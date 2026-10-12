@@ -8,5 +8,8 @@
 *.png binary
 *.ico binary
 *.exe binary
+*.dll binary
 *.zip binary
 assets/** binary
+# Preserve the upstream license's original whitespace.
+third_party/LittleCMS/LICENSE whitespace=-blank-at-eol

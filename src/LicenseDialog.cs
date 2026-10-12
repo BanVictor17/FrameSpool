@@ -23,6 +23,11 @@ namespace FrameSpool
                     using(var save=new SaveFileDialog{FileName="LibRaw-0.22.2.zip",Filter="Source archive (*.zip)|*.zip"})
                     if(save.ShowDialog(dialog)==DialogResult.OK)using(var stream=AppRuntime.Open("notices/LibRaw/LibRaw-0.22.2.zip"))using(var destination=File.Create(save.FileName))stream.CopyTo(destination);
                 });
+                Ui.Button(dialog,"Save LittleCMS Source...",212,512,210,25,delegate
+                {
+                    using(var save=new SaveFileDialog{FileName="lcms2-2.19.1.zip",Filter="Source archive (*.zip)|*.zip"})
+                    if(save.ShowDialog(dialog)==DialogResult.OK)using(var stream=AppRuntime.Open("notices/LittleCMS/lcms2-2.19.1.zip"))using(var destination=File.Create(save.FileName))stream.CopyTo(destination);
+                });
                 Ui.Button(dialog,"Close",648,512,100,25,delegate{dialog.Close();});if(files.Items.Count>0)files.SelectedIndex=0;dialog.ShowDialog(owner);
             }
         }

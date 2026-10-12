@@ -194,7 +194,7 @@ namespace FrameSpool
         public const long MaximumRedEyePixels = 20000000;
         public const string CorrectionFidelityNote =
             "PhotoEnhance, scene, red-eye, skin and face adjustments use independent approximate algorithms. " +
-            "Camera RAW files are developed by LibRaw into sRGB. Embedded bitmap ICC profiles use Windows color management. " +
+            "Camera RAW files are developed by LibRaw into sRGB. Embedded RGB ICC profiles are converted to sRGB by bundled LittleCMS. " +
             "PRINT Image Matching metadata is not interpreted.";
 
         public static readonly string[] SupportedExtensions = new string[] {
@@ -238,7 +238,7 @@ namespace FrameSpool
             using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (Image source = Image.FromStream(stream, false, true))
             {
-                byte[] colorProfile = WindowsColorManagement.EmbeddedProfile(source);
+                byte[] colorProfile = PhotoColorManagement.EmbeddedProfile(source);
                 ApplyExifOrientation(source, GetExifOrientation(source));
                 Bitmap bitmap = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
                 try
@@ -248,7 +248,7 @@ namespace FrameSpool
                         graphics.CompositingMode = CompositingMode.SourceCopy;
                         graphics.DrawImage(source, new Rectangle(0, 0, bitmap.Width, bitmap.Height));
                     }
-                    WindowsColorManagement.ConvertToSrgb(bitmap, colorProfile);
+                    PhotoColorManagement.ConvertToSrgb(bitmap, colorProfile);
                     return bitmap;
                 }
                 catch { bitmap.Dispose(); throw; }
@@ -452,7 +452,7 @@ namespace FrameSpool
             try
             {
                 byte[] profile = image.GetPropertyItem(0x8773).Value;
-                output["Color Management"] = profile.Length >= 128 ? "Embedded ICC profile (Windows color management)" : "sRGB assumed";
+                output["Color Management"] = profile.Length >= 128 ? "Embedded ICC profile (LittleCMS to sRGB)" : "sRGB assumed";
             }
             catch (ArgumentException) { output["Color Management"] = "sRGB assumed when no embedded profile is present"; }
         }

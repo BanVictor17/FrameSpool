@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace FrameSpool
 {
@@ -155,29 +156,82 @@ namespace FrameSpool
             check("Embedded ICC profile detected in image metadata", photo.Metadata["Color Management"].StartsWith("Embedded ICC", StringComparison.Ordinal));
             using (var managed = PhotoEngine.LoadImage(profiled))
             using (var unmanaged = PhotoEngine.LoadImage(plain))
-                check("Windows embedded ICC transform applied before correction", managed.GetPixel(60, 40).B > managed.GetPixel(60, 40).R && unmanaged.GetPixel(60, 40).R > unmanaged.GetPixel(60, 40).B);
+                check("Bundled embedded ICC transform applied before correction", managed.GetPixel(60, 40).B > managed.GetPixel(60, 40).R && unmanaged.GetPixel(60, 40).R > unmanaged.GetPixel(60, 40).B);
             using (var transparent = new Bitmap(30, 20, PixelFormat.Format32bppArgb))
             {
                 transparent.SetPixel(10, 10, Color.FromArgb(91, 230, 25, 12));
-                WindowsColorManagement.ConvertToSrgb(transparent, profile);
+                PhotoColorManagement.ConvertToSrgb(transparent, profile);
                 Color color = transparent.GetPixel(10, 10);
                 check("ICC conversion preserves image alpha", color.A == 91 && color.B > color.R);
             }
             bool rejected = false;
             using (var bitmap = new Bitmap(30, 20))
-                try { WindowsColorManagement.ConvertToSrgb(bitmap, new byte[128]); } catch (InvalidDataException) { rejected = true; }
+                try { PhotoColorManagement.ConvertToSrgb(bitmap, new byte[128]); } catch (InvalidDataException) { rejected = true; }
             check("Malformed embedded ICC profiles fail explicitly", rejected);
+            string modern = Path.Combine(directory, "generated-profiled-v4.jpg");
+            byte[] modernProfile = CreateSwappedProfile(true);
+            WriteProfiledJpeg(modern, image, modernProfile);
+            string digest = Digest(modern);
+            var modernPhoto = new PhotoItem(modern);
+            modernPhoto.Adjustments.Mode = "None";
+            using (var managed = PhotoEngine.LoadImage(modern))
+                check("ICC v4.4 parametric curves convert to sRGB without Windows ICM", managed.GetPixel(60, 40).B > 200 && managed.GetPixel(60, 40).R < 40);
+            using (var thumbnail = PhotoEngine.CreateThumbnail(modernPhoto, 120, 80))
+            using (var corrected = PhotoEngine.RenderImage(modernPhoto, true))
+                check("ICC v4 photos work in thumbnails and corrected print/export rendering", thumbnail.GetPixel(60, 40).B > 200 && corrected.GetPixel(60, 40).B > 200);
+            bool[] results = new bool[8];
+            Parallel.For(0, results.Length, delegate(int index)
+            {
+                using (var bitmap = PhotoEngine.LoadImage(index % 2 == 0 ? modern : profiled))
+                    results[index] = bitmap.GetPixel(60, 40).B > 200 && bitmap.GetPixel(60, 40).R < 40;
+            });
+            check("Concurrent ICC v2/v4 decoding keeps color transforms independent", Array.TrueForAll(results, value => value));
+            using (var transparent = new Bitmap(13, 7, PixelFormat.Format32bppArgb))
+            {
+                for (int y = 0; y < 7; y++) for (int x = 0; x < 13; x++)
+                    transparent.SetPixel(x, y, Color.FromArgb((x + y * 13) * 255 / 90, 235, 25, 12));
+                PhotoColorManagement.ConvertToSrgb(transparent, modernProfile);
+                bool preserved = true;
+                for (int y = 0; y < 7; y++) for (int x = 0; x < 13; x++)
+                {
+                    Color pixel = transparent.GetPixel(x, y);
+                    preserved &= pixel.A == (x + y * 13) * 255 / 90 && pixel.B > 200 && pixel.R < 40;
+                }
+                check("ICC v4 conversion preserves all alpha values and row boundaries", preserved);
+            }
+            byte[] truncated = new byte[modernProfile.Length - 8]; Array.Copy(modernProfile, truncated, truncated.Length);
+            rejected = false;
+            using (var bitmap = new Bitmap(13, 7))
+            {
+                bitmap.SetPixel(6, 3, Color.Red);
+                try { PhotoColorManagement.ConvertToSrgb(bitmap, truncated); } catch (InvalidDataException) { rejected = true; }
+                check("Truncated ICC tags are rejected before image pixels change", rejected && bitmap.GetPixel(6, 3).ToArgb() == Color.Red.ToArgb());
+            }
+            check("ICC decoding leaves original photo and profile bytes untouched", Digest(modern) == digest && Convert.ToHexString(profile) == Convert.ToHexString(CreateSwappedProfile()) && Convert.ToHexString(modernProfile) == Convert.ToHexString(CreateSwappedProfile(true)));
+        }
+
+        private static void WriteProfiledJpeg(string path, byte[] image, byte[] profile)
+        {
+            using (var file = File.Create(path))
+            {
+                file.Write(image, 0, 2); file.WriteByte(255); file.WriteByte(226);
+                int length = profile.Length + 16;
+                file.WriteByte((byte)(length >> 8)); file.WriteByte((byte)length);
+                byte[] signature = Encoding.ASCII.GetBytes("ICC_PROFILE\0"); file.Write(signature, 0, signature.Length);
+                file.WriteByte(1); file.WriteByte(1); file.Write(profile, 0, profile.Length);
+                file.Write(image, 2, image.Length - 2);
+            }
         }
 
         // A generated RGB matrix ICC v2 profile, with red and blue primaries swapped.
         // No proprietary profile or camera file is distributed in these tests.
-        private static byte[] CreateSwappedProfile()
+        private static byte[] CreateSwappedProfile(bool modern = false)
         {
             var tags = new List<KeyValuePair<string, byte[]>>();
             byte[] description = new byte[128]; PutAscii(description, 0, "desc"); Put32(description, 8, 29); PutAscii(description, 12, "FrameSpool generated profile\0");
-            tags.Add(new KeyValuePair<string, byte[]>("desc", description));
+            tags.Add(new KeyValuePair<string, byte[]>("desc", modern ? LocalizedText("FrameSpool generated profile") : description));
             byte[] copyright = new byte[64]; PutAscii(copyright, 0, "text"); PutAscii(copyright, 8, "FrameSpool test fixture, public domain\0");
-            tags.Add(new KeyValuePair<string, byte[]>("cprt", copyright));
+            tags.Add(new KeyValuePair<string, byte[]>("cprt", modern ? LocalizedText("FrameSpool fixture, public domain") : copyright));
             tags.Add(new KeyValuePair<string, byte[]>("wtpt", Xyz(.9642, 1, .8249)));
             tags.Add(new KeyValuePair<string, byte[]>("rXYZ", Xyz(.1430804, .0606169, .7141733)));
             tags.Add(new KeyValuePair<string, byte[]>("gXYZ", Xyz(.3850649, .7168786, .0971045)));
@@ -185,12 +239,13 @@ namespace FrameSpool
             foreach (string name in new[]{"rTRC","gTRC","bTRC"})
             {
                 byte[] curve = new byte[16]; PutAscii(curve, 0, "curv"); Put32(curve, 8, 1); curve[12] = 2; curve[13] = 51;
+                if (modern) { curve = new byte[16]; PutAscii(curve, 0, "para"); Put32(curve, 12, (int)Math.Round(2.2 * 65536)); }
                 tags.Add(new KeyValuePair<string, byte[]>(name, curve));
             }
             int position = 128 + 4 + tags.Count * 12;
             int total = position;
             foreach (var tag in tags) total += (tag.Value.Length + 3) & ~3;
-            byte[] profile = new byte[total]; Put32(profile, 0, total); Put32(profile, 8, 0x02100000);
+            byte[] profile = new byte[total]; Put32(profile, 0, total); Put32(profile, 8, modern ? 0x04400000 : 0x02100000);
             PutAscii(profile, 12, "mntr"); PutAscii(profile, 16, "RGB "); PutAscii(profile, 20, "XYZ ");
             profile[24] = 7; profile[25] = 234; profile[27] = 10; profile[29] = 11;
             PutAscii(profile, 36, "acsp"); PutAscii(profile, 40, "MSFT");
@@ -202,6 +257,12 @@ namespace FrameSpool
                 Array.Copy(tags[i].Value, 0, profile, position, tags[i].Value.Length); position += (tags[i].Value.Length + 3) & ~3;
             }
             return profile;
+        }
+        private static byte[] LocalizedText(string value)
+        {
+            byte[] text = Encoding.BigEndianUnicode.GetBytes(value), bytes = new byte[28 + text.Length];
+            PutAscii(bytes, 0, "mluc"); Put32(bytes, 8, 1); Put32(bytes, 12, 12); PutAscii(bytes, 16, "enUS");
+            Put32(bytes, 20, text.Length); Put32(bytes, 24, 28); Array.Copy(text, 0, bytes, 28, text.Length); return bytes;
         }
         private static byte[] Xyz(double x, double y, double z) { byte[] bytes = new byte[20]; PutAscii(bytes, 0, "XYZ "); Put32(bytes, 8, (int)Math.Round(x * 65536)); Put32(bytes, 12, (int)Math.Round(y * 65536)); Put32(bytes, 16, (int)Math.Round(z * 65536)); return bytes; }
         private static void PutAscii(byte[] bytes, int offset, string value) { Array.Copy(Encoding.ASCII.GetBytes(value), 0, bytes, offset, value.Length); }

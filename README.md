@@ -3,7 +3,7 @@
 **The familiar photo-printing workflow, with broader printer support.**
 
 [![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078D4?logo=windows)](https://github.com/BanVictor17/FrameSpool/releases)
-[![Release](https://img.shields.io/badge/release-v0.2.3-318A65)](https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.3)
+[![Release](https://img.shields.io/badge/release-v0.2.4-318A65)](https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.4)
 [![Build](https://github.com/BanVictor17/FrameSpool/actions/workflows/windows.yml/badge.svg?branch=main)](https://github.com/BanVictor17/FrameSpool/actions/workflows/windows.yml)
 [![Code license](https://img.shields.io/badge/code%20license-MIT-596575)](LICENSE)
 
@@ -14,7 +14,7 @@ It keeps the classic workflow and familiar artwork while using **installed Windo
 ![FrameSpool arranging photos in an eight-photo layout](docs/screenshots/layouts.png)
 
 <p align="center">
-  <a href="https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.3"><b>Download v0.2.3</b></a> ·
+  <a href="https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.4"><b>Download v0.2.4</b></a> ·
   <a href="#what-you-can-do">Features</a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="#printing">Printer setup</a> ·
@@ -30,7 +30,7 @@ It keeps the classic workflow and familiar artwork while using **installed Windo
 | **Cropping and placement** | Zoom, fit, move and rotate each placed photo. Repeated copies keep independent crops. |
 | **Image corrections** | Adjust brightness and scenes, monochrome, red-eye and portrait controls; preview the corrected result. |
 | **Camera RAW** | Develop supported RAW files, change exposure and white balance, and inspect RGB histograms. |
-| **Color profiles** | Convert embedded RGB ICC profiles to sRGB before corrections. |
+| **Color profiles** | Convert embedded RGB ICC v2/v4 profiles to sRGB with bundled LittleCMS before corrections. |
 | **Editable frames** | Create frames with rectangular/oval openings, artwork, text and lines. Import compatible legacy templates and share `.fspframe` packages. |
 | **Quick Print A/B** | Save layout/driver presets and create desktop shortcuts that accept dropped photos or folders. |
 | **GitHub updates** | Check the latest stable release, verify its checksum and update the portable EXE or installed MSI. |
@@ -52,13 +52,13 @@ Application code was written independently; recovered artwork/layout data is reu
 
 | Download | Best for |
 | --- | --- |
-| [**Portable EXE**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.3/FrameSpool-0.2.3-win-x64.exe) | One file: download and open. Move or rename it as needed. |
-| [**MSI installer**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.3/FrameSpool-0.2.3-win-x64.msi) | A regular installation with a Start menu shortcut, upgrades and Windows uninstall support. |
-| [**Portable ZIP**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.3/FrameSpool-0.2.3-win-x64-portable.zip) | The same EXE with documentation, notices and decoder source alongside it. |
+| [**Portable EXE**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.4/FrameSpool-0.2.4-win-x64.exe) | One file: download and open. Move or rename it as needed. |
+| [**MSI installer**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.4/FrameSpool-0.2.4-win-x64.msi) | A regular installation with a Start menu shortcut, upgrades and Windows uninstall support. |
+| [**Portable ZIP**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.4/FrameSpool-0.2.4-win-x64-portable.zip) | The same EXE with documentation, notices and decoder source alongside it. |
 
-The installer uses `%LOCALAPPDATA%\Programs\FrameSpool` for the current account. Preferences and photos are preserved when uninstalling. An optional desktop shortcut can be enabled with `msiexec /i FrameSpool-0.2.3-win-x64.msi INSTALLDESKTOPSHORTCUT=1`.
+The installer uses `%LOCALAPPDATA%\Programs\FrameSpool` for the current account. Preferences and photos are preserved when uninstalling. An optional desktop shortcut can be enabled with `msiexec /i FrameSpool-0.2.4-win-x64.msi INSTALLDESKTOPSHORTCUT=1`.
 
-Embedded license texts and decoder source are available in **Help > About > Licenses**. [SHA256 checksums](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.3/SHA256SUMS.txt) accompany each release.
+Embedded license texts, decoder source and color-engine source are available in **Help > About > Licenses**. [SHA256 checksums](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.4/SHA256SUMS.txt) accompany each release.
 
 **Updates:** choose **Help > Check for Updates** (also in About). Portable copies replace their current EXE, including renamed copies; installed copies run the new MSI and preserve their installation location. The app checks stable releases only, downloads on your request, verifies GitHub’s SHA256 digest, then restarts. Preferences and frames are kept; the current photo selection closes. Updating needs internet access and permission to write the app’s folder. Version 0.2.1 and earlier need this release downloaded manually to get the update button.
 
@@ -89,7 +89,7 @@ Select a photo folder, use **File > Open Photos/Open Folder**, or drop photos/fo
 
 **Positioning** adjusts each placed copy's crop, scale, offset and rotation. **Manual** places and moves photos in slots. Right-click a placed photo and choose **Clear Settings** to remove it; invalid drops keep it in place. Repeated placements have independent crops and share source corrections. Zero page copies skips that page.
 
-**Image Correct** previews print/export corrections; the main preview shows source colors. **RAW Development** provides -3 to +3 EV in half-stop increments and seven white-balance choices. **Histogram** shows RGB levels. JPEG, TIFF, PNG, BMP, GIF and supported camera RAW files work. Embedded RGB ICC profiles convert to sRGB through Windows ICM. Unsupported/corrupt profiles or camera compression modes report errors. See [decoder details](third_party/LibRaw/README.md).
+**Image Correct** previews print/export corrections; the main preview shows source colors. **RAW Development** provides -3 to +3 EV in half-stop increments and seven white-balance choices. **Histogram** shows RGB levels. JPEG, TIFF, PNG, BMP, GIF and supported camera RAW files work. Embedded RGB ICC v2/v4 profiles convert to sRGB through bundled LittleCMS, independently of Windows system profiles. Unsupported/corrupt profiles or camera compression modes report errors. See [decoder details](third_party/LibRaw/README.md).
 
 **Frame Menu > Create/Edit Frame** creates rectangular/oval openings, artwork, text and lines. Import compatible EPPIF 3.1 single-page 360dpi FD2/PIF templates, images, earlier `.eppframe.json` files or `.fspframe` packages. **Export Selected Frame** creates a portable `.fspframe` package containing artwork and editable geometry. It does not export a legacy PIF.
 

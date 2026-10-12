@@ -1,6 +1,6 @@
 param([string]$MsiPath, [string]$PreviousMsiPath)
 $ErrorActionPreference='Stop'
-if(-not $MsiPath){$MsiPath=Join-Path $PSScriptRoot 'dist\release\FrameSpool-0.2.3-win-x64.msi'}
+if(-not $MsiPath){$MsiPath=Join-Path $PSScriptRoot 'dist\release\FrameSpool-0.2.4-win-x64.msi'}
 $MsiPath=[IO.Path]::GetFullPath($MsiPath)
 $taskResults=Join-Path $PSScriptRoot 'obj\verification-msi'
 $taskInstall=Join-Path $taskResults ('installed-'+[Guid]::NewGuid().ToString('N'))
@@ -65,7 +65,7 @@ try {
     if(-not(Test-Path -LiteralPath $taskShortcut)){throw 'Start menu shortcut is missing.'}
     $taskShell=New-Object -ComObject WScript.Shell
     if($taskShell.CreateShortcut($taskShortcut).TargetPath -ne $taskExe){throw 'Start menu shortcut targets the wrong executable.'};$taskChecks.Add('Start menu shortcut targets installed app')
-    foreach($taskNotice in @('LICENSE','ASSET_NOTICES.md','THIRD_PARTY_NOTICES.md','third_party\LibRaw\LICENSE.CDDL','third_party\LibRaw\LibRaw-0.22.2.zip')){if(-not(Test-Path -LiteralPath (Join-Path $taskInstall $taskNotice))){throw ('Installer notice/source missing: '+$taskNotice)}};$taskChecks.Add('License notices and corresponding decoder source installed')
+    foreach($taskNotice in @('LICENSE','ASSET_NOTICES.md','THIRD_PARTY_NOTICES.md','third_party\LibRaw\LICENSE.CDDL','third_party\LibRaw\LibRaw-0.22.2.zip','third_party\LittleCMS\LICENSE','third_party\LittleCMS\lcms2-2.19.1.zip','third_party\LittleCMS\README.md')){if(-not(Test-Path -LiteralPath (Join-Path $taskInstall $taskNotice))){throw ('Installer notice/source missing: '+$taskNotice)}};$taskChecks.Add('License notices and corresponding decoder/color-engine sources installed')
     Write-Output 'Running application checks against the installed executable.'
     $taskRun=Start-Process -FilePath $taskExe -ArgumentList @('--self-test',('"'+(Join-Path $taskResults 'app-tests')+'"')) -WorkingDirectory $taskInstall -WindowStyle Hidden -PassThru
     if(-not $taskRun.WaitForExit(180000)){Stop-Process -Id $taskRun.Id;throw 'Installed app verification timed out.'}
