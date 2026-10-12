@@ -12,7 +12,8 @@ namespace FrameSpool
         {
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
-            Application.ThreadException+=delegate(object s,System.Threading.ThreadExceptionEventArgs e){ReportError(e.Exception);};
+            bool verifying=args.Length>0&&args[0]=="--self-test";
+            Application.ThreadException+=delegate(object s,System.Threading.ThreadExceptionEventArgs e){if(verifying)Verification.RecordUiException(e.Exception);else ReportError(e.Exception);};
             try
             {
                 if(args.Length==2&&args[0]=="--apply-update")return AppUpdates.Apply(Path.GetFullPath(args[1]));

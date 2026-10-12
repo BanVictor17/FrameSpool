@@ -15,7 +15,7 @@ namespace FrameSpool
             Action<string,bool> check=(name,passed)=>checks.Add(new VerificationCheck{Name=name,Passed=passed,Detail="Positioning and cached navigation"});
             string second=Path.Combine(directory,"navigation-blue.png");
             using(var image=new Bitmap(600,400)){using(var g=Graphics.FromImage(image))g.Clear(Color.Blue);image.Save(second,ImageFormat.Png);}
-            using(var form=new MainForm(new[]{fixture}))
+            using(var form=new MainForm(new[]{fixture},System.IO.Path.Combine(directory,"NavigationVerification-preferences.json")))
             {
                 form.Opacity=0;form.ShowInTaskbar=false;form.Size=new Size(1040,720);form.Show();Application.DoEvents();
                 form.AllPhotos.Clear();var first=new PhotoItem(fixture){Copies=1};var last=new PhotoItem(second){Copies=1};form.AllPhotos.AddRange(new[]{first,last});

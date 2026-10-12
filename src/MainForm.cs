@@ -39,15 +39,17 @@ namespace FrameSpool
         RadioButton photoLayoutRadio, frameLayoutRadio;
         ComboBox frameCategory;
         readonly ToolTip tips = new ToolTip();
-        readonly string settingsFile = Path.Combine(AppIdentity.DataDirectory, "preferences.json");
+        readonly string settingsFile;
         readonly Dictionary<string, int> pageCopyCounts = new Dictionary<string,int>();
         CancellationTokenSource importCancellation;
         bool importing;
         int loadMinimumImageSize;
         string pendingQuickPrint;
         readonly List<PhotoItem> launchPhotos = new List<PhotoItem>();
-        public MainForm(string[] files)
+        public MainForm(string[] files) : this(files, null) { }
+        internal MainForm(string[] files, string preferencesPath)
         {
+            settingsFile=preferencesPath??Path.Combine(AppIdentity.DataDirectory,"preferences.json");
             Text=AppIdentity.Name; Size=new Size(800,600); MinimumSize=new Size(800,600);
             DoubleBuffered=true;SetStyle(ControlStyles.ResizeRedraw,true);
             StartPosition=FormStartPosition.CenterScreen; Font=Ui.Font(12); AutoScaleMode=AutoScaleMode.None;
@@ -66,17 +68,18 @@ namespace FrameSpool
             LoadBrowserPreferences(); BuildBrowser(); BuildMenus();
             AllowDrop=true; DragEnter+=delegate(object s,DragEventArgs e){if(e.Data.GetDataPresent(DataFormats.FileDrop))e.Effect=DragDropEffects.Copy;};
             DragDrop+=delegate(object s,DragEventArgs e){ImportFiles((string[])e.Data.GetData(DataFormats.FileDrop),true);};
-            FormClosing+=delegate { if(importCancellation!=null)importCancellation.Cancel();SavePreferences(); if(manualPalette!=null)manualPalette.Close();if(positioningPalette!=null)positioningPalette.Close(); };
+            Resize+=delegate{TrackWindowPlacement();};LocationChanged+=delegate{TrackWindowPlacement();};
+            FormClosing+=delegate { if(importCancellation!=null)importCancellation.Cancel();SaveWindowPlacement();SavePreferences(); if(manualPalette!=null)manualPalette.Close();if(positioningPalette!=null)positioningPalette.Close(); };
             Shown+=delegate { if(files.Length>0){currentFolder=Directory.Exists(files[0])?files[0]:Path.GetDirectoryName(files[0]); ImportFiles(files,false);if(!importing)launchPhotos.AddRange(folderPhotos.Photos);}else LoadFolder(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)); };
         }
         protected override void Dispose(bool disposing)
         {
-            if(disposing){tips.Dispose();if(frameMenu!=null)frameMenu.Dispose();if(manualPalette!=null)manualPalette.Dispose();if(positioningPalette!=null)positioningPalette.Dispose();}
+            if(disposing){DisposeCachedBrowser();tips.Dispose();if(frameMenu!=null)frameMenu.Dispose();if(manualPalette!=null)manualPalette.Dispose();if(positioningPalette!=null)positioningPalette.Dispose();}
             base.Dispose(disposing);
         }
         static void CopyOptions(PrintOptions a,PrintOptions b) { if(a==null||b==null)return;foreach(var f in typeof(PrintOptions).GetFields())f.SetValue(b,f.GetValue(a)); }
         void SavePreferences() { try{WorkflowStorage.Save(settingsFile,Options);}catch{} }
-        public List<PhotoItem> Selected { get { return AllPhotos.Where(p=>p.Copies>0).ToList(); } }
+        public List<PhotoItem> Selected { get { return OrderedSelection(); } }
         void ClearBody()
         {
             body.SuspendLayout();body.Visible=false;
@@ -118,7 +121,7 @@ namespace FrameSpool
             file.DropDownItems.Add(new ToolStripSeparator());AddMenu(file,"E&xit",Close);menu.Items.Add(file);
             var props=new ToolStripMenuItem("Prop&erties");AddMenu(props,"&Select All",ShowSelectAll,Keys.Control|Keys.A);if(printingScreen)AddMenu(props,"&Reset Manual Flow",delegate{RebuildPages(true);});menu.Items.Add(props);
             var view=new ToolStripMenuItem("&View");var thumb=new ToolStripMenuItem("&Thumbnail Size");foreach(int n in new[]{80,130,170,220}){int size=n;AddMenu(thumb,n==80?"Small":n==130?"Normal":n==170?"Large":"Largest",delegate{browserThumbnailSize=size;PersistBrowserPreferences();var tiles=printingScreen?manualPhotos:folderPhotos;if(tiles!=null&&!tiles.IsDisposed){tiles.TileSize=size;tiles.RefreshPhotos();}});}view.DropDownItems.Add(thumb);
-            if(!printingScreen){var sort=new ToolStripMenuItem("&Sort By");foreach(string kind in new[]{"File Name","Photo Date","File Modification Date"}){string choice=kind;var order=new ToolStripMenuItem(kind);AddMenu(order,"Ascending",delegate{SetPhotoSort(choice,false);});AddMenu(order,"Descending",delegate{SetPhotoSort(choice,true);});sort.DropDownItems.Add(order);}view.DropDownItems.Add(sort);AddMenu(view,"&Enlargement...",delegate{ShowEnlargement(FocusPhoto);});AddMenu(view,"&Refresh",delegate{LoadFolder(currentFolder);},Keys.F5);}else AddMenu(view,"&Photos to Print",ShowManualPalette,Keys.Control|Keys.M);menu.Items.Add(view);
+            if(!printingScreen){var sort=new ToolStripMenuItem("&Sort By");foreach(string kind in new[]{"File Name","Photo Date","File Modification Date"}){string choice=kind;var order=new ToolStripMenuItem(kind);AddMenu(order,"Ascending",delegate{SetPhotoSort(choice,false);});AddMenu(order,"Descending",delegate{SetPhotoSort(choice,true);});sort.DropDownItems.Add(order);}view.DropDownItems.Add(sort);AddMenu(view,"&Enlargement...",delegate{ShowEnlargement(FocusPhoto);});AddMenu(view,"&Refresh",RefreshExplorer,Keys.F5);}else AddMenu(view,"&Photos to Print",ShowManualPalette,Keys.Control|Keys.M);menu.Items.Add(view);
             var tools=new ToolStripMenuItem("&Tools");if(printingScreen)AddMenu(tools,"&Register Quick Print Settings...",ShowQuickPrint);AddMenu(tools,"&Preferences...",ShowPreferences);menu.Items.Add(tools);
             var help=new ToolStripMenuItem("&Help");AddMenu(help,"FrameSpool &User's Guide",delegate{ShowHelp(printingScreen?"Print Settings":"Select Photos");},Keys.F1);var tooltips=new ToolStripMenuItem("Show &ToolTips"){Checked=browserShowToolTips,CheckOnClick=true};tooltips.CheckedChanged+=delegate{browserShowToolTips=tips.Active=tooltips.Checked;PersistBrowserPreferences();};help.DropDownItems.Add(tooltips);var alerts=new ToolStripMenuItem("&Show Alerts"){Checked=browserShowAlerts,CheckOnClick=true};alerts.CheckedChanged+=delegate{browserShowAlerts=alerts.Checked;PersistBrowserPreferences();};help.DropDownItems.Add(alerts);AddMenu(help,"RAW Format Information...",ShowRawInfo);AddMenu(help,"Check for &Updates...",ShowUpdates);AddMenu(help,"&About FrameSpool...",ShowAbout);menu.Items.Add(help);
         }
@@ -127,6 +130,7 @@ namespace FrameSpool
         void BuildBrowser()
         {
             printingScreen=false;ClearBody();
+            if(RestoreCachedBrowser())return;
             folders=new TreeView{Location=new Point(5,5),ShowLines=true,HideSelection=false,Font=Ui.Font(12),BorderStyle=BorderStyle.Fixed3D};
             var images=new ImageList{ImageSize=new Size(16,16),ColorDepth=ColorDepth.Depth32Bit};images.Images.Add(SystemIcons.WinLogo);using(var bmp=new Bitmap(16,16)){using(var g=Graphics.FromImage(bmp)){g.FillRectangle(Brushes.Goldenrod,1,4,14,10);g.FillRectangle(Brushes.Goldenrod,2,2,6,4);g.DrawRectangle(Pens.DarkGoldenrod,1,4,13,9);}images.Images.Add(bmp);var initializedHandle=images.Handle;}folders.ImageList=images;folders.Disposed+=delegate{images.Dispose();};
             AddFolderNode(folders.Nodes,"Desktop",Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),0);
@@ -137,8 +141,10 @@ namespace FrameSpool
             AddFolderNode(folders.Nodes,"Documents",Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),1);
             string downloads=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads");if(Directory.Exists(downloads))AddFolderNode(folders.Nodes,"Downloads",downloads,1);
             computer.Expand();
-            folders.BeforeExpand+=delegate(object s,TreeViewCancelEventArgs e){if(e.Node.Nodes.Count==1&&e.Node.Nodes[0].Tag==null){e.Node.Nodes.Clear();try{foreach(var dir in Directory.EnumerateDirectories((string)e.Node.Tag).OrderBy(p=>Path.GetFileName(p),StringComparer.CurrentCultureIgnoreCase))if((File.GetAttributes(dir)&FileAttributes.Hidden)==0)AddFolderNode(e.Node.Nodes,Path.GetFileName(dir),dir,1);}catch{e.Node.Nodes.Add(new TreeNode("Folder unavailable"){ForeColor=Color.Gray});}}};
-            folders.AfterSelect+=delegate(object s,TreeViewEventArgs e){var path=e.Node.Tag as string;if(path!=null)LoadFolder(path);};body.Controls.Add(folders);
+            folders.ShowNodeToolTips=true;
+            folders.BeforeExpand+=delegate(object s,TreeViewCancelEventArgs e){PopulateFolderNode(e.Node,false);};
+            folders.AfterSelect+=delegate(object s,TreeViewEventArgs e){var path=e.Node.Tag as string;if(!syncingFolders&&path!=null&&Control.MouseButtons!=MouseButtons.Right)LoadFolder(path);};body.Controls.Add(folders);
+            BuildExplorerNavigation();
             folderPhotos=new TileView{OneClickSelection=browserOneClickSelection,TileSize=browserThumbnailSize,BackColor=Color.FromArgb(221,221,221)};selectedPhotos=new TileView{SelectionList=true,BackColor=Color.FromArgb(221,221,221)};body.Controls.Add(folderPhotos);body.Controls.Add(selectedPhotos);
             folderPhotos.PhotoFocused+=Focus;selectedPhotos.PhotoFocused+=Focus;folderPhotos.PhotoEnlarged+=ShowEnlargement;selectedPhotos.PhotoEnlarged+=ShowEnlargement;
             folderPhotos.CopiesChanged+=delegate(PhotoItem p){if(Selected.Count>999){p.Copies=0;MessageBox.Show(this,"You can select up to 999 photos.","FrameSpool");}RefreshSelection();};
@@ -153,29 +159,39 @@ namespace FrameSpool
             quickPrint=Ui.Check(body,"Print Using Registered Settings",0,0,270,false,null);var registered=ReadQuickPrint();quickPrint.Visible=registered.A!=null||registered.B!=null;quickPrint.CheckedChanged+=delegate{next.Text=quickPrint.Checked?"Quick Print":"Next Step";};
             tips.Active=browserShowToolTips;tips.SetToolTip(all,"Set copies for every photo in this folder.");tips.SetToolTip(enlarge,"Show the focused photo and its metadata.");tips.SetToolTip(remove,"Remove the focused photo from Photos to Print.");tips.SetToolTip(next,"Choose the layout and print settings.");tips.SetToolTip(quickPrint,"Print using registered settings A or B.");tips.SetToolTip(folders,"Browse local folders and removable drives.");
             body.Paint+=PaintBrowserFooter;
-            bodyLayout=delegate { if(printingScreen)return;ConfigureWorkspaceScroll();int w=Math.Max(784,(int)(body.ClientSize.Width/UiScale)),h=Math.Max(521,(int)(body.ClientSize.Height/UiScale));folders.Bounds=Scaled(new Rectangle(5,5,160,h-95));folderPhotos.Bounds=Scaled(new Rectangle(169,5,w-334,h-95));selectedPhotos.Bounds=Scaled(new Rectangle(w-155,30,143,h-165));selectedCount.Bounds=Scaled(new Rectangle(w-145,10,141,18));all.Top=Pixels(h-88);enlarge.Top=Pixels(h-44);remove.Location=Scaled(new Point(w-155,h-128));next.Location=Scaled(new Point(w-159,h-77));quickPrint.Location=Scaled(new Point(w-288,h-88));fileInfo.Bounds=Scaled(new Rectangle(290,h-66,Math.Max(50,w-590),60));};body.Resize+=bodyLayout;
+            bodyLayout=delegate { if(printingScreen)return;ConfigureWorkspaceScroll();LayoutExplorerNavigation();int w=Math.Max(784,(int)(body.ClientSize.Width/UiScale)),h=Math.Max(521,(int)(body.ClientSize.Height/UiScale));browserNavigation.Bounds=Scaled(new Rectangle(5,5,160,26));browserAddress.Bounds=Scaled(new Rectangle(5,34,160,24));folders.Bounds=Scaled(new Rectangle(5,62,160,h-152));folderPhotos.Bounds=Scaled(new Rectangle(169,5,w-334,h-95));selectedPhotos.Bounds=Scaled(new Rectangle(w-155,30,143,h-165));selectedCount.Bounds=Scaled(new Rectangle(w-145,10,141,18));all.Top=Pixels(h-88);enlarge.Top=Pixels(h-44);remove.Location=Scaled(new Point(w-155,h-128));next.Location=Scaled(new Point(w-159,h-77));quickPrint.Location=Scaled(new Point(w-288,h-88));fileInfo.Bounds=Scaled(new Rectangle(290,h-66,Math.Max(50,w-590),60));};body.Resize+=bodyLayout;
             FinishScreen();RefreshSelection();
         }
         void PaintBrowserFooter(object s,PaintEventArgs e){if(printingScreen)return;var bmp=Skin.GetImage("EPQImage/bmp_1-1-07.bmp");if(bmp!=null)e.Graphics.DrawImage(bmp,new Rectangle(Pixels(210),body.Height-Pixels(88),Math.Max(1,body.Width-Pixels(210)),Pixels(88)));e.Graphics.DrawLine(Pens.Silver,body.Width-Pixels(160),Pixels(3),body.Width-Pixels(5),Pixels(3));}
         void AddFolderNode(TreeNodeCollection nodes,string name,string path,int icon){if(String.IsNullOrEmpty(path))return;using(var shellIcon=FolderShellIcon.Read(path)){if(shellIcon!=null){folders.ImageList.Images.Add(shellIcon);icon=folders.ImageList.Images.Count-1;}}var node=new TreeNode(name){Tag=path,ImageIndex=icon,SelectedImageIndex=icon};node.Nodes.Add(new TreeNode(""));nodes.Add(node);}
-        void LoadFolder(string path)
-        { if(String.IsNullOrEmpty(path))return;if(!Directory.Exists(path)){ShowFolderPhotos(new List<PhotoItem>());ShowBrowserAlert("This folder is unavailable. Reconnect the drive or choose another folder.","Folder");return;}currentFolder=path;try{ImportFiles(new[]{path},false);}catch(Exception ex){ShowBrowserAlert(ex.Message,"Folder");} }
-        void ImportFiles(string[] files,bool select)
+        void LoadFolder(string path) { NavigateFolder(path,true); }
+        void ImportFiles(string[] files,bool select,bool recordFolderNavigation=true)
         {
             if(importCancellation!=null){importCancellation.Cancel();importCancellation=null;importing=false;}
             var expanded=new List<string>();int invalid=0;bool limited=false;
-            foreach(var entry in files??new string[0])try{if(Directory.Exists(entry)){currentFolder=entry;foreach(var path in Directory.EnumerateFiles(entry)){if(!PhotoEngine.CanDecode(path))continue;if(expanded.Count==999){limited=true;break;}expanded.Add(Path.GetFullPath(path));}}else if(PhotoEngine.CanDecode(entry)){if(expanded.Count==999){limited=true;break;}expanded.Add(Path.GetFullPath(entry));}}catch{invalid++;}
+            foreach(var entry in files??new string[0])try{if(Directory.Exists(entry)){currentFolder=FolderPath(entry);if(recordFolderNavigation)RecordFolderHistory(currentFolder);foreach(var path in Directory.EnumerateFiles(entry)){if(!PhotoEngine.CanDecode(path))continue;if(expanded.Count==999){limited=true;break;}expanded.Add(Path.GetFullPath(path));}}else if(PhotoEngine.CanDecode(entry)){if(expanded.Count==999){limited=true;break;}expanded.Add(Path.GetFullPath(entry));}}catch{invalid++;}
             expanded=expanded.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if(expanded.Count>32){LoadPhotoBatch(expanded,select,invalid,limited);return;}
             var visible=new List<PhotoItem>();foreach(var path in expanded){var photo=AllPhotos.FirstOrDefault(p=>String.Equals(p.FilePath,path,StringComparison.OrdinalIgnoreCase));if(photo==null)try{photo=new PhotoItem(path);if(PhotoEngine.ValidateDimensions(photo.Width,photo.Height,loadMinimumImageSize)!=null){invalid++;continue;}AllPhotos.Add(photo);}catch{invalid++;continue;}visible.Add(photo);}
             FinishImport(visible,select,invalid,limited);
         }
-        void ShowFolderPhotos(List<PhotoItem> photos){if(folderPhotos==null||folderPhotos.IsDisposed)return;Func<PhotoItem,string> key=browserSort=="Photo Date"?(Func<PhotoItem,string>)(p=>p.CaptureDate.ToString("O")):browserSort=="File Modification Date"?(Func<PhotoItem,string>)(p=>SafeModified(p.FilePath).ToString("O")):(p=>p.FileName);var ordered=(photos??new List<PhotoItem>()).OrderBy(key,StringComparer.CurrentCultureIgnoreCase);folderPhotos.Photos=(browserSortDescending?ordered.Reverse():ordered).ToList();folderPhotos.RefreshPhotos();if(folderPhotos.Photos.Count>0)Focus(folderPhotos.Photos[0]);else Focus(null);}
+        List<PhotoItem> OrderBrowserPhotos(List<PhotoItem> photos)
+        {
+            Func<PhotoItem,string> key=browserSort=="Photo Date"?(Func<PhotoItem,string>)(p=>p.CaptureDate.ToString("O")):browserSort=="File Modification Date"?(Func<PhotoItem,string>)(p=>SafeModified(p.FilePath).ToString("O")):(p=>p.FileName);
+            var ordered=(photos??new List<PhotoItem>()).OrderBy(key,StringComparer.CurrentCultureIgnoreCase);
+            return (browserSortDescending?ordered.Reverse():ordered).ToList();
+        }
+        void ShowFolderPhotos(List<PhotoItem> photos)
+        {
+            if(folderPhotos==null||folderPhotos.IsDisposed)return;
+            folderPhotos.Photos=OrderBrowserPhotos(photos);folderPhotos.RefreshPhotos();Focus(folderPhotos.Photos.FirstOrDefault());
+        }
         void Focus(PhotoItem photo){FocusPhoto=photo;if(folderPhotos!=null&&!folderPhotos.IsDisposed){folderPhotos.FocusPhoto=photo;folderPhotos.Invalidate();}if(selectedPhotos!=null&&!selectedPhotos.IsDisposed){selectedPhotos.FocusPhoto=photo;selectedPhotos.Invalidate();}if(fileInfo!=null&&!fileInfo.IsDisposed)fileInfo.Text=photo==null?"File:\r\nSize:\r\nDate:":"File:      "+photo.FileName+"\r\nSize:     "+(photo.FileSize/1024).ToString("N0")+" KB\r\nDate:    "+photo.CaptureDate.ToString("yyyy.MM.dd HH:mm");if(preview!=null&&!preview.IsDisposed){preview.FocusPhoto=photo;preview.Invalidate();}SyncPositioningControls();}
         void RefreshSelection(){if(!printingScreen&&selectedPhotos!=null&&!selectedPhotos.IsDisposed){selectedPhotos.Photos=Selected;selectedPhotos.RefreshPhotos();folderPhotos.Invalidate();next.Enabled=Selected.Count>0;enlarge.Enabled=FocusPhoto!=null;remove.Enabled=FocusPhoto!=null&&FocusPhoto.Copies>0;selectedCount.Text="Photos to Print";}if(printingScreen)UpdatePage();}
         void RemoveFocused(){if(FocusPhoto==null)return;FocusPhoto.Copies=0;RefreshSelection();}
         void BuildPrinting()
         {
+            CacheBrowser();PreparePrintSelection();
             bool preferredFrame=CurrentLayout!=null&&(CurrentLayout.Design!=null||CurrentLayout.Overlay!=null);
             printingScreen=true;ClearBody();
             if(CurrentLayout==null)CurrentLayout=FrameSpool.LayoutEngine.ForPaper(Options.Paper).FirstOrDefault();RebuildPages();
@@ -235,7 +251,7 @@ namespace FrameSpool
         void UpdatePrinterSummary(){if(printerInfo==null||printerInfo.IsDisposed)return;printerInfo.Text=Options.Printer+"\r\n"+Options.Source+"\r\n"+(Options.Borderless?"Borderless":"Borders")+"\r\n"+Options.Paper+"\r\n"+Options.PaperType+"\r\n"+Options.Mode;}
         void ShowManualPalette()
         { if(manualPalette!=null&&!manualPalette.IsDisposed){manualPhotos.Photos=Selected;manualPhotos.RefreshPhotos();manualPalette.Show();return;}manualPalette=Ui.Dialog("Photos to Print",300,430);manualPalette.FormBorderStyle=FormBorderStyle.SizableToolWindow;manualPhotos=new TileView{Dock=DockStyle.Fill,Photos=Selected,OneClickSelection=false,TileSize=browserThumbnailSize};manualPhotos.PhotoFocused+=delegate(PhotoItem photo){var placed=Pages.Count==0?null:Pages[pageIndex].Photos.FirstOrDefault(p=>p!=null&&(p.Original??p)==photo);if(placed!=null)Focus(placed);};manualPhotos.AllowPhotoDrag=true;manualPalette.Controls.Add(manualPhotos);manualPalette.Show(this); }
-        void ReturnToBrowser(){if(positioningPalette!=null)positioningPalette.Close();if(manualPalette!=null)manualPalette.Close();BuildBrowser();BuildMenus();LoadFolder(currentFolder);}
+        void ReturnToBrowser(){if(positioningPalette!=null)positioningPalette.Close();if(manualPalette!=null)manualPalette.Close();BuildBrowser();BuildMenus();}
         void AssignManualPhoto(int index,string path){if(!manualMode||index<0||CurrentLayout==null||index>=CurrentLayout.Frames.Count)return;var photo=AllPhotos.FirstOrDefault(a=>String.Equals(a.FilePath,path,StringComparison.OrdinalIgnoreCase));if(photo==null){try{photo=new PhotoItem(path);if(PhotoEngine.ValidateDimensions(photo.Width,photo.Height,loadMinimumImageSize)!=null)return;photo.Copies=1;AllPhotos.Add(photo);}catch{return;}}if(Pages.Count==0)Pages.Add(new PhotoPage());var page=Pages[pageIndex];while(page.Photos.Count<=index)page.Photos.Add(null);var placement=photo.CreatePlacement();page.Photos[index]=placement;Focus(placement);UpdatePage();}
         void Print()
         {PrintWithDriver(true);}

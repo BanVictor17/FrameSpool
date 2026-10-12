@@ -178,18 +178,7 @@ namespace FrameSpool
                 Ui.Skin(dialog, "", "EPQImage/btn_1-3-04_u.bmp", 109, 160, 58, 30, delegate { if (count.Value < 99) count.Value++; });
                 Ui.Skin(dialog, "", "EPQImage/btn_1-3-05_u.bmp", 109, 200, 58, 30, delegate { if (count.Value > 0) count.Value--; });
                 Button ok = Ui.Button(dialog, "OK", 12, 297, 85, 21, delegate {
-                    int value = (int)count.Value;
-                    int existingOutside = AllPhotos.Count(p => p.Copies > 0 && !targets.Contains(p));
-                    int allowed = 999 - existingOutside, assigned = 0, skipped = 0;
-                    // Keep already-selected targets before assigning new targets at the file limit.
-                    foreach (PhotoItem photo in targets.OrderByDescending(p => p.Copies > 0))
-                    {
-                        if (value == 0) photo.Copies = 0;
-                        else if (assigned < allowed) { photo.Copies = value; assigned++; }
-                        else { photo.Copies = 0; skipped++; }
-                    }
-                    RefreshSelection();
-                    if (printingScreen) RebuildPages();
+                    int skipped = ApplySelectAll(targets, (int)count.Value);
                     dialog.Close();
                     if (skipped > 0) MessageBox.Show(this, "The maximum number of readable image files is 999. " + skipped + " photo(s) were not added.", "Select All");
                 });

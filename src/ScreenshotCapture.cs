@@ -13,13 +13,14 @@ namespace FrameSpool
         internal static int CaptureScreenshots(string directory,string sample)
         {
             Directory.CreateDirectory(directory);
-            using(var form=new MainForm(new[]{sample}))
+            using(var form=new MainForm(new[]{sample},Path.Combine(directory,"capture-preferences.json")))
             {
                 form.ShowInTaskbar=false;form.Opacity=0;form.Size=new Size(1040,720);form.Show();Application.DoEvents();form.AllPhotos.Clear();
                 var first=new PhotoItem(sample){Copies=6,Comment="Blue Marble"};first.Adjustments.Mode="None";
                 var second=new PhotoItem(sample){Copies=2};second.Rotation=1;second.Adjustments.Mode="None";
                 form.AllPhotos.AddRange(new[]{first,second});form.ShowFolderPhotos(form.AllPhotos);form.Focus(first);form.RefreshSelection();
                 form.folders.Nodes.Clear();var root=form.folders.Nodes.Add("Demo Photos");root.Tag=Path.GetDirectoryName(sample);root.Nodes.Add("Earth").Tag=root.Tag;root.Expand();
+                form.currentFolder="Demo Photos";form.UpdateExplorerNavigation();
                 SaveSurface(form,Path.Combine(directory,"select-photos.png"));
                 form.Options.Paper="A4";form.Options.PaperType=form.Options.Mode="Printer Properties";form.Options.Borderless=false;
                 form.CurrentLayout=FrameSpool.LayoutEngine.ForPaper("A4").First(l=>l.Frames.Count==8&&!l.Id.StartsWith("bo"));form.BuildPrinting();form.BuildMenus();form.PerformLayout();

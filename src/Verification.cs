@@ -19,6 +19,8 @@ namespace FrameSpool
 
     public static class Verification
     {
+        static readonly List<Exception> uiExceptions=new List<Exception>();
+        internal static void RecordUiException(Exception error){lock(uiExceptions)uiExceptions.Add(error);}
         public static int PrintPdfTest(string outputDir)
         {
             string directory=Path.GetFullPath(outputDir),fixture=Path.Combine(directory,"source-fixture.png");
@@ -258,6 +260,7 @@ namespace FrameSpool
                 MainForm.VerifyVisuals(directory,fixture,checks);
                 MainForm.VerifyNavigation(directory,fixture,checks);
                 MainForm.VerifyWorkflows(directory,fixture,checks);
+                MainForm.VerifyBrowserState(directory,fixture,checks);
                 DriverVerification.Run(directory,checks);
                 UpdateVerification.Run(directory,checks);
                 Check(checks,"Driver mode rejects truncated or corrupt buffers",!DriverSettings.IsValidMode(new byte[20])&&!DriverSettings.IsValidMode(new byte[72]));
@@ -274,6 +277,11 @@ namespace FrameSpool
                 }
             }
             catch (Exception ex) { Check(checks, "Verification completed without an exception", false, ex.ToString()); }
+            lock(uiExceptions)
+            {
+                Check(checks,"UI verification completes without unhandled event exceptions",uiExceptions.Count==0,String.Join("\r\n",uiExceptions.Select(e=>e.ToString())));
+                uiExceptions.Clear();
+            }
             int failed = checks.Count(c => !c.Passed);
             try
             {

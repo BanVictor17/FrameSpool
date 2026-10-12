@@ -1,6 +1,6 @@
 param([string]$MsiPath, [string]$PreviousMsiPath)
 $ErrorActionPreference='Stop'
-if(-not $MsiPath){$MsiPath=Join-Path $PSScriptRoot 'dist\release\FrameSpool-0.2.4-win-x64.msi'}
+if(-not $MsiPath){$MsiPath=Join-Path $PSScriptRoot 'dist\release\FrameSpool-0.2.5-win-x64.msi'}
 $MsiPath=[IO.Path]::GetFullPath($MsiPath)
 $taskResults=Join-Path $PSScriptRoot 'obj\verification-msi'
 $taskInstall=Join-Path $taskResults ('installed-'+[Guid]::NewGuid().ToString('N'))

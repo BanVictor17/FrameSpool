@@ -26,7 +26,7 @@ namespace FrameSpool
                 var prefs=new JavaScriptSerializer().Deserialize<BrowserPreferences>(File.ReadAllText(saved));check("Preferences replacement keeps valid complete JSON",prefs.ShowAlerts&&prefs.Sort=="Photo Date"&&prefs.SortDescending&&Directory.GetFiles(temporary,"*.tmp").Length==0);
                 var older=new JavaScriptSerializer().Deserialize<BrowserPreferences>("{\"OneClickSelection\":false}");check("Older preferences retain enabled alert and tooltip defaults",older.ShowAlerts&&older.ShowToolTips&&older.ThumbnailSize==130);
                 string shortcut=Path.Combine(temporary,"test.lnk");QuickPrintShortcut.Create(shortcut,"B");check("Desktop shortcut retains executable and registered settings",QuickPrintShortcut.IsRegisteredShortcut(shortcut,"B")&&!QuickPrintShortcut.IsRegisteredShortcut(shortcut,"A"));
-                using(var form=new MainForm(new[]{fixture}))
+                using(var form=new MainForm(new[]{fixture},System.IO.Path.Combine(directory,"WorkflowVerification-preferences.json")))
                 {
                     form.ShowInTaskbar=false;form.Opacity=0;form.Show();Application.DoEvents();form.AllPhotos.Clear();form.browserShowAlerts=false;form.loadMinimumImageSize=60;
                     var a=new PhotoItem(fixture){Copies=1};form.AllPhotos.Add(a);form.ShowFolderPhotos(new List<PhotoItem>{a});

@@ -30,10 +30,16 @@ namespace FrameSpool
             foreach(var photo in visible)
             {
                 if(!AllPhotos.Contains(photo))AllPhotos.Add(photo);
-                if(select&&photo.Copies==0){if(selected<999){photo.Copies=1;selected++;}else skipped++;}
+                if(select&&photo.Copies==0){if(selected<999){photo.Copies=1;selectionOrder.Add(photo);selected++;}else skipped++;}
             }
-            launchPhotos.Clear();launchPhotos.AddRange(visible);
-            if(!printingScreen)ShowFolderPhotos(visible);else RebuildPages();RefreshSelection();
+            launchPhotos.Clear();launchPhotos.AddRange(select?visible:OrderBrowserPhotos(visible));
+            if(!printingScreen){ShowFolderPhotos(visible);if(!String.IsNullOrEmpty(currentFolder)&&Directory.Exists(currentFolder)){currentFolder=FolderPath(currentFolder);if(folderHistoryIndex<0)RecordFolderHistory(currentFolder);SyncFolderTree(currentFolder);}UpdateExplorerNavigation();}
+            else
+            {
+                if(cachedBrowser!=null){cachedBrowser.Photos.Photos=OrderBrowserPhotos(visible);cachedBrowser.Photos.RefreshPhotos();cachedBrowser.PhotoScroll=Point.Empty;cachedBrowser.Focus=cachedBrowser.Photos.Photos.FirstOrDefault();}
+                RebuildPages();
+            }
+            RefreshSelection();
             if(select&&invalid>0)ShowBrowserAlert(invalid+" photo(s) could not be loaded. Check the format, decoder and image dimensions.","Open Photos");
             if(select&&visible.Count==0&&invalid==0)ShowBrowserAlert("No supported photos were found in the selected files or folders.","Open Photos");
             if(limited||skipped>0)ShowBrowserAlert("The maximum number of readable image files is 999. Additional files were not added.","Open Photos");
@@ -85,7 +91,7 @@ namespace FrameSpool
             if(launchPhotos.Count>0)
             {
                 int count=Selected.Count;
-                foreach(var photo in launchPhotos)if(photo.Copies==0&&count<999){photo.Copies=1;count++;}
+                foreach(var photo in launchPhotos)if(photo.Copies==0&&count<999){photo.Copies=1;selectionOrder.Add(photo);count++;}
                 RefreshSelection();
             }
             if(Selected.Count==0){pendingQuickPrint=slot;OpenPhotos();if(!importing&&Selected.Count==0)pendingQuickPrint=null;return;}
@@ -93,6 +99,10 @@ namespace FrameSpool
         }
         protected override bool ProcessCmdKey(ref Message message,Keys keys)
         {
+            if(!printingScreen&&keys==(Keys.Alt|Keys.Left)){MoveFolderHistory(-1);return true;}
+            if(!printingScreen&&keys==(Keys.Alt|Keys.Right)){MoveFolderHistory(1);return true;}
+            if(!printingScreen&&keys==(Keys.Alt|Keys.Up)){GoToParentFolder();return true;}
+            if(!printingScreen&&keys==(Keys.Control|Keys.L)){browserAddress.Focus();browserAddress.SelectAll();return true;}
             if(preview!=null&&!preview.IsDisposed&&preview.IsDragging&&(keys==Keys.PageUp||keys==Keys.PageDown||keys==Keys.Escape))return base.ProcessCmdKey(ref message,keys);
             if(ActiveControl is TextBoxBase||ActiveControl is NumericUpDown||ActiveControl is ComboBox)return base.ProcessCmdKey(ref message,keys);
             if(keys==Keys.Delete&&!printingScreen){RemoveFocused();return true;}

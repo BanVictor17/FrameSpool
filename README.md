@@ -3,7 +3,7 @@
 **The familiar photo-printing workflow, with broader printer support.**
 
 [![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011%20x64-0078D4?logo=windows)](https://github.com/BanVictor17/FrameSpool/releases)
-[![Release](https://img.shields.io/badge/release-v0.2.4-318A65)](https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.4)
+[![Release](https://img.shields.io/badge/release-v0.2.5-318A65)](https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.5)
 [![Build](https://github.com/BanVictor17/FrameSpool/actions/workflows/windows.yml/badge.svg?branch=main)](https://github.com/BanVictor17/FrameSpool/actions/workflows/windows.yml)
 [![Code license](https://img.shields.io/badge/code%20license-MIT-596575)](LICENSE)
 
@@ -14,7 +14,7 @@ It keeps the classic workflow and familiar artwork while using **installed Windo
 ![FrameSpool arranging photos in an eight-photo layout](docs/screenshots/layouts.png)
 
 <p align="center">
-  <a href="https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.4"><b>Download v0.2.4</b></a> ·
+  <a href="https://github.com/BanVictor17/FrameSpool/releases/tag/v0.2.5"><b>Download v0.2.5</b></a> ·
   <a href="#what-you-can-do">Features</a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="#printing">Printer setup</a> ·
@@ -52,13 +52,13 @@ Application code was written independently; recovered artwork/layout data is reu
 
 | Download | Best for |
 | --- | --- |
-| [**Portable EXE**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.4/FrameSpool-0.2.4-win-x64.exe) | One file: download and open. Move or rename it as needed. |
-| [**MSI installer**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.4/FrameSpool-0.2.4-win-x64.msi) | A regular installation with a Start menu shortcut, upgrades and Windows uninstall support. |
-| [**Portable ZIP**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.4/FrameSpool-0.2.4-win-x64-portable.zip) | The same EXE with documentation, notices and decoder source alongside it. |
+| [**Portable EXE**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.5/FrameSpool-0.2.5-win-x64.exe) | One file: download and open. Move or rename it as needed. |
+| [**MSI installer**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.5/FrameSpool-0.2.5-win-x64.msi) | A regular installation with a Start menu shortcut, upgrades and Windows uninstall support. |
+| [**Portable ZIP**](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.5/FrameSpool-0.2.5-win-x64-portable.zip) | The same EXE with documentation, notices and decoder source alongside it. |
 
-The installer uses `%LOCALAPPDATA%\Programs\FrameSpool` for the current account. Preferences and photos are preserved when uninstalling. An optional desktop shortcut can be enabled with `msiexec /i FrameSpool-0.2.4-win-x64.msi INSTALLDESKTOPSHORTCUT=1`.
+The installer uses `%LOCALAPPDATA%\Programs\FrameSpool` for the current account. Preferences and photos are preserved when uninstalling. An optional desktop shortcut can be enabled with `msiexec /i FrameSpool-0.2.5-win-x64.msi INSTALLDESKTOPSHORTCUT=1`.
 
-Embedded license texts, decoder source and color-engine source are available in **Help > About > Licenses**. [SHA256 checksums](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.4/SHA256SUMS.txt) accompany each release.
+Embedded license texts, decoder source and color-engine source are available in **Help > About > Licenses**. [SHA256 checksums](https://github.com/BanVictor17/FrameSpool/releases/download/v0.2.5/SHA256SUMS.txt) accompany each release.
 
 **Updates:** choose **Help > Check for Updates** (also in About). Portable copies replace their current EXE, including renamed copies; installed copies run the new MSI and preserve their installation location. The app checks stable releases only, downloads on your request, verifies GitHub’s SHA256 digest, then restarts. Preferences and frames are kept; the current photo selection closes. Updating needs internet access and permission to write the app’s folder. Version 0.2.1 and earlier need this release downloaded manually to get the update button.
 
@@ -86,6 +86,12 @@ The Blue Marble demonstration image is credited to [NASA, PIA18033](https://imag
 ### Photo and frame tools
 
 Select a photo folder, use **File > Open Photos/Open Folder**, or drop photos/folders onto the app. Click photos to select them and use plus/minus for copies. Arrow keys change focus; Space toggles selection and Delete removes a selection. Large imports can be cancelled. Choose **Next Step**, paper and a layout.
+
+The folder explorer has **Back, Forward, Up, Refresh and a folder address field**. Use **Alt+Left/Right/Up**, **Ctrl+L** for the address, or **F5** to refresh. Switching to Print Settings and back preserves expanded folders, photo scroll and browser focus.
+
+Photos print in selection order. Individual clicks append photos in click order; **Select All** follows the visible grid from left to right, then top to bottom, including the current sort direction. Copies of a photo stay together. Changing the selection starts a fresh print session at page one and resets page-copy counts.
+
+The app remembers its normal window size/position and maximized state. Closing while minimized restores the previous normal or maximized state next time. Saved windows are kept within the available monitor area.
 
 **Positioning** adjusts each placed copy's crop, scale, offset and rotation. **Manual** places and moves photos in slots. Right-click a placed photo and choose **Clear Settings** to remove it; invalid drops keep it in place. Repeated placements have independent crops and share source corrections. Zero page copies skips that page.
 

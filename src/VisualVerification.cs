@@ -17,7 +17,7 @@ namespace FrameSpool
         internal static void VerifyVisuals(string directory,string fixture,List<VerificationCheck> checks)
         {
             Action<string,bool> check=delegate(string name,bool passed){checks.Add(new VerificationCheck{Name=name,Passed=passed,Detail="In-process Windows Forms verification"});};
-            using(var form=new MainForm(new[]{fixture}))
+            using(var form=new MainForm(new[]{fixture},System.IO.Path.Combine(directory,"VisualVerification-preferences.json")))
             {
                 form.ShowInTaskbar=false;form.Opacity=0;form.Show();Application.DoEvents();form.AllPhotos.Clear();form.PerformLayout();
                 var photo=new PhotoItem(fixture){Copies=1};photo.Adjustments.Mode="None";
