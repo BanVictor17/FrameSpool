@@ -171,20 +171,28 @@ namespace FrameSpool
         internal int At(Point point) { if(LayoutDefinition==null||!Sheet.Contains(point))return -1;for(int i=LayoutDefinition.Frames.Count-1;i>=0;i--)using(var path=SlotPath(i))if(path.IsVisible(point))return i;return -1; }
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            base.OnMouseDown(e);Focus();int i=At(e.Location);pressedSlot=-1;
+            base.OnMouseDown(e);EndPhotoPositioning();Focus();int i=At(e.Location);pressedSlot=-1;
             if(Page==null||i<0||i>=Page.Photos.Count||Page.Photos[i]==null)return;
             FocusPhoto=Page.Photos[i];if(PhotoFocused!=null)PhotoFocused(FocusPhoto);
             if(EnableManual&&e.Button==MouseButtons.Left){pressedSlot=i;pressedPoint=e.Location;}
+            if(!EnableManual&&e.Button==MouseButtons.Left)BeginPhotoPositioning(i,e.Location);
             if(EnableManual&&e.Button==MouseButtons.Right){contextSlot=i;slotMenu.Show(this,e.Location);}Invalidate();
         }
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            base.OnMouseMove(e);if(!EnableManual||pressedSlot<0||e.Button!=MouseButtons.Left)return;
+            base.OnMouseMove(e);
+            if(!EnableManual)
+            {
+                if(positioningPhoto!=null){if(e.Button==MouseButtons.Left)MovePhotoPosition(e.Location);else EndPhotoPositioning();}
+                else{int i=At(e.Location);Cursor=Page!=null&&i>=0&&i<Page.Photos.Count&&Page.Photos[i]!=null?Cursors.Hand:Cursors.Default;}
+                return;
+            }
+            if(pressedSlot<0||e.Button!=MouseButtons.Left)return;
             var size=SystemInformation.DragSize;if(new Rectangle(pressedPoint.X-size.Width/2,pressedPoint.Y-size.Height/2,size.Width,size.Height).Contains(e.Location))return;
             int slot=pressedSlot;pressedSlot=-1;var data=new DataObject();data.SetData("FrameSpool.Slot",slot);data.SetData("FrameSpool.Page",Page);IsDragging=true;
             try{DoDragDrop(data,DragDropEffects.Move);}finally{IsDragging=false;}
         }
-        protected override void OnMouseUp(MouseEventArgs e){pressedSlot=-1;base.OnMouseUp(e);}
+        protected override void OnMouseUp(MouseEventArgs e){if(positioningPhoto!=null&&e.Button==MouseButtons.Left){if(IsDragging)MovePhotoPosition(e.Location);EndPhotoPositioning();}pressedSlot=-1;base.OnMouseUp(e);}
         internal DragDropEffects DropEffect(IDataObject data,Point point)
         {
             if(!EnableManual||data==null||At(point)<0)return DragDropEffects.None;

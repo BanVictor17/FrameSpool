@@ -39,14 +39,15 @@ namespace FrameSpool
                 if(cachedBrowser!=null){cachedBrowser.Photos.Photos=OrderBrowserPhotos(visible);cachedBrowser.Photos.RefreshPhotos();cachedBrowser.PhotoScroll=Point.Empty;cachedBrowser.Focus=cachedBrowser.Photos.Photos.FirstOrDefault();}
                 RebuildPages();
             }
-            RefreshSelection();
+            RefreshSelection();UpdateFolderWatchers();
             if(select&&invalid>0)ShowBrowserAlert(invalid+" photo(s) could not be loaded. Check the format, decoder and image dimensions.","Open Photos");
             if(select&&visible.Count==0&&invalid==0)ShowBrowserAlert("No supported photos were found in the selected files or folders.","Open Photos");
             if(limited||skipped>0)ShowBrowserAlert("The maximum number of readable image files is 999. Additional files were not added.","Open Photos");
             if(pendingQuickPrint!=null){string slot=pendingQuickPrint;pendingQuickPrint=null;StartQuickPrint(slot);}
         }
-        async void LoadPhotoBatch(List<string> paths,bool select,int skipped,bool limited)
+        async void LoadPhotoBatch(List<string> paths,bool select,int skipped,bool limited,bool background=false)
         {
+            string folder=currentFolder;var focused=FocusPhoto;var scroll=folderPhotos==null?Point.Empty:folderPhotos.AutoScrollPosition;
             var cancellation=new CancellationTokenSource();importCancellation=cancellation;importing=true;
             var existing=AllPhotos.GroupBy(p=>p.FilePath,StringComparer.OrdinalIgnoreCase).ToDictionary(g=>g.Key,g=>g.First(),StringComparer.OrdinalIgnoreCase);
             int minimum=loadMinimumImageSize;
@@ -55,7 +56,7 @@ namespace FrameSpool
             var status=Ui.Label(progress,"Reading photo information...",15,15,340,20);
             var bar=new ProgressBar{Bounds=new Rectangle(15,42,340,16),Maximum=Math.Max(1,paths.Count)};progress.Controls.Add(bar);
             var cancel=Ui.Button(progress,"Cancel",265,79,90,23,delegate{cancellation.Cancel();});progress.CancelButton=cancel;
-            progress.FormClosing+=delegate{cancellation.Cancel();};progress.Show(this);
+            progress.FormClosing+=delegate{cancellation.Cancel();};if(!background)progress.Show(this);
             var reporter=new Progress<int>(count=>{if(!progress.IsDisposed){bar.Value=Math.Min(bar.Maximum,count);status.Text="Reading photo "+count+" of "+paths.Count;}});
             try
             {
@@ -73,7 +74,12 @@ namespace FrameSpool
                     }
                     return found;
                 },cancellation.Token);
-                if(!IsDisposed&&!cancellation.IsCancellationRequested&&Object.ReferenceEquals(importCancellation,cancellation)){completed=true;FinishImport(loaded,select,skipped,limited);}
+                if(!IsDisposed&&!cancellation.IsCancellationRequested&&Object.ReferenceEquals(importCancellation,cancellation))
+                {
+                    completed=true;FinishImport(loaded,select,skipped,limited);
+                    if(background&&!printingScreen&&SameFolder(folder,currentFolder))
+                    {if(focused!=null&&folderPhotos.Photos.Contains(focused))Focus(focused);folderPhotos.AutoScrollPosition=new Point(-scroll.X,-scroll.Y);}
+                }
             }
             catch(OperationCanceledException){}
             catch(Exception error){if(!IsDisposed)MessageBox.Show(this,"Cannot load the photos.\r\n"+error.Message,"Open Photos",MessageBoxButtons.OK,MessageBoxIcon.Information);}
@@ -103,6 +109,7 @@ namespace FrameSpool
             if(!printingScreen&&keys==(Keys.Alt|Keys.Right)){MoveFolderHistory(1);return true;}
             if(!printingScreen&&keys==(Keys.Alt|Keys.Up)){GoToParentFolder();return true;}
             if(!printingScreen&&keys==(Keys.Control|Keys.L)){browserAddress.Focus();browserAddress.SelectAll();return true;}
+            if(printingScreen&&keys==Keys.Escape&&preview!=null&&preview.CancelPhotoPositioning())return true;
             if(preview!=null&&!preview.IsDisposed&&preview.IsDragging&&(keys==Keys.PageUp||keys==Keys.PageDown||keys==Keys.Escape))return base.ProcessCmdKey(ref message,keys);
             if(ActiveControl is TextBoxBase||ActiveControl is NumericUpDown||ActiveControl is ComboBox)return base.ProcessCmdKey(ref message,keys);
             if(keys==Keys.Delete&&!printingScreen){RemoveFocused();return true;}

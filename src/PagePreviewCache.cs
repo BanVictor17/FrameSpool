@@ -77,6 +77,7 @@ namespace FrameSpool
         {cacheClosed=true;foreach(var entry in pageCache.Values)entry.Image.Dispose();pageCache.Clear();adjacent.Clear();}
         void RequestPagePreview()
         {
+            if(positioningPhoto!=null&&!PositioningCurrent)EndPhotoPositioning();
             if(LayoutDefinition==null||IsDisposed)return;
             var snapshot=CaptureSnapshot(LayoutDefinition,Page);bool navigating=renderedPage!=Page||renderedLayout!=LayoutDefinition;
             renderedPage=Page;renderedLayout=LayoutDefinition;
@@ -84,7 +85,7 @@ namespace FrameSpool
             requestedKey=snapshot.Key;
             if(pageCache.TryGetValue(snapshot.Key,out var cached))
             {cached.Used=++cacheClock;renderer.Display((Bitmap)cached.Image.Clone());}
-            else renderer.Request(snapshot.Render,false,navigating);
+            else renderer.Request(snapshot.Render,false,navigating||positioningPhoto!=null&&IsDragging);
         }
     }
 }

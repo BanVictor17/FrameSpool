@@ -96,6 +96,7 @@ namespace FrameSpool
             folderPhotos.AutoScrollPosition=new Point(-saved.PhotoScroll.X,-saved.PhotoScroll.Y);
             selectedPhotos.AutoScrollPosition=new Point(-saved.SelectedScroll.X,-saved.SelectedScroll.Y);
             body.AutoScrollPosition=new Point(-saved.BodyScroll.X,-saved.BodyScroll.Y);
+            UpdateFolderWatchers();
             return true;
         }
         void DisposeCachedBrowser()

@@ -165,10 +165,14 @@ namespace FrameSpool
                     foreach(var node in computer.Nodes.Cast<TreeNode>().ToArray())if(node.Tag is string path&&!drives.Contains(path,StringComparer.OrdinalIgnoreCase))node.Remove();
                     foreach(var drive in drives)if(!computer.Nodes.Cast<TreeNode>().Any(n=>SameFolder(n.Tag as string,drive)))AddFolderNode(computer.Nodes,drive,drive,0);
                 }
-                if(folders.SelectedNode!=null)PopulateFolderNode(folders.SelectedNode,true);
+                // Refresh every populated branch, including Desktop when another
+                // folder is selected. Keep existing nodes and their expansion state.
+                foreach(var node in ObservedFolderNodes().ToArray())
+                    if(node.TreeView==folders)PopulateFolderNode(node,true);
             }
             finally{folders.EndUpdate();syncingFolders=false;}
-            NavigateFolder(currentFolder,false);
+            UpdateFolderWatchers();
+            RefreshCurrentFolder(true);
         }
     }
 }

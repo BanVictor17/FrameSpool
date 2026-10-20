@@ -89,11 +89,15 @@ Select a photo folder, use **File > Open Photos/Open Folder**, or drop photos/fo
 
 The folder explorer has **Back, Forward, Up, Refresh and a folder address field**. Use **Alt+Left/Right/Up**, **Ctrl+L** for the address, or **F5** to refresh. Switching to Print Settings and back preserves expanded folders, photo scroll and browser focus.
 
+Folders update automatically when directories are created, renamed or deleted, including Desktop while another folder is selected. New and removed photo files also update the open folder. **View > Refresh** and **F5** refresh all loaded branches.
+
 Photos print in selection order. Individual clicks append photos in click order; **Select All** follows the visible grid from left to right, then top to bottom, including the current sort direction. Copies of a photo stay together. Changing the selection starts a fresh print session at page one and resets page-copy counts.
 
 The app remembers its normal window size/position and maximized state. Closing while minimized restores the previous normal or maximized state next time. Saved windows are kept within the available monitor area.
 
 **Positioning** adjusts each placed copy's crop, scale, offset and rotation. **Manual** places and moves photos in slots. Right-click a placed photo and choose **Clear Settings** to remove it; invalid drops keep it in place. Repeated placements have independent crops and share source corrections. Zero page copies skips that page.
+
+In **Automatic** flow, drag a photo directly in the main page preview to move it inside its frame. Release to keep the position, or press **Escape** during the drag to cancel. The movement keeps the current Fit/Trim and magnification settings and applies to that placed copy.
 
 **Image Correct** previews print/export corrections; the main preview shows source colors. **RAW Development** provides -3 to +3 EV in half-stop increments and seven white-balance choices. **Histogram** shows RGB levels. JPEG, TIFF, PNG, BMP, GIF and supported camera RAW files work. Embedded RGB ICC v2/v4 profiles convert to sRGB through bundled LittleCMS, independently of Windows system profiles. Unsupported/corrupt profiles or camera compression modes report errors. See [decoder details](third_party/LibRaw/README.md).
 

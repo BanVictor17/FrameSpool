@@ -74,7 +74,7 @@ namespace FrameSpool
         }
         protected override void Dispose(bool disposing)
         {
-            if(disposing){DisposeCachedBrowser();tips.Dispose();if(frameMenu!=null)frameMenu.Dispose();if(manualPalette!=null)manualPalette.Dispose();if(positioningPalette!=null)positioningPalette.Dispose();}
+            if(disposing){DisposeExplorerMonitoring();DisposeCachedBrowser();tips.Dispose();if(frameMenu!=null)frameMenu.Dispose();if(manualPalette!=null)manualPalette.Dispose();if(positioningPalette!=null)positioningPalette.Dispose();}
             base.Dispose(disposing);
         }
         static void CopyOptions(PrintOptions a,PrintOptions b) { if(a==null||b==null)return;foreach(var f in typeof(PrintOptions).GetFields())f.SetValue(b,f.GetValue(a)); }
@@ -142,7 +142,9 @@ namespace FrameSpool
             string downloads=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads");if(Directory.Exists(downloads))AddFolderNode(folders.Nodes,"Downloads",downloads,1);
             computer.Expand();
             folders.ShowNodeToolTips=true;
-            folders.BeforeExpand+=delegate(object s,TreeViewCancelEventArgs e){PopulateFolderNode(e.Node,false);};
+            folders.BeforeExpand+=delegate(object s,TreeViewCancelEventArgs e){PopulateFolderNode(e.Node,false);if(!syncingFolders)UpdateFolderWatchers();};
+            folders.AfterExpand+=delegate{if(!syncingFolders)UpdateFolderWatchers();};
+            folders.AfterCollapse+=delegate{if(!syncingFolders)UpdateFolderWatchers();};
             folders.AfterSelect+=delegate(object s,TreeViewEventArgs e){var path=e.Node.Tag as string;if(!syncingFolders&&path!=null&&Control.MouseButtons!=MouseButtons.Right)LoadFolder(path);};body.Controls.Add(folders);
             BuildExplorerNavigation();
             folderPhotos=new TileView{OneClickSelection=browserOneClickSelection,TileSize=browserThumbnailSize,BackColor=Color.FromArgb(221,221,221)};selectedPhotos=new TileView{SelectionList=true,BackColor=Color.FromArgb(221,221,221)};body.Controls.Add(folderPhotos);body.Controls.Add(selectedPhotos);
@@ -160,18 +162,19 @@ namespace FrameSpool
             tips.Active=browserShowToolTips;tips.SetToolTip(all,"Set copies for every photo in this folder.");tips.SetToolTip(enlarge,"Show the focused photo and its metadata.");tips.SetToolTip(remove,"Remove the focused photo from Photos to Print.");tips.SetToolTip(next,"Choose the layout and print settings.");tips.SetToolTip(quickPrint,"Print using registered settings A or B.");tips.SetToolTip(folders,"Browse local folders and removable drives.");
             body.Paint+=PaintBrowserFooter;
             bodyLayout=delegate { if(printingScreen)return;ConfigureWorkspaceScroll();LayoutExplorerNavigation();int w=Math.Max(784,(int)(body.ClientSize.Width/UiScale)),h=Math.Max(521,(int)(body.ClientSize.Height/UiScale));browserNavigation.Bounds=Scaled(new Rectangle(5,5,160,26));browserAddress.Bounds=Scaled(new Rectangle(5,34,160,24));folders.Bounds=Scaled(new Rectangle(5,62,160,h-152));folderPhotos.Bounds=Scaled(new Rectangle(169,5,w-334,h-95));selectedPhotos.Bounds=Scaled(new Rectangle(w-155,30,143,h-165));selectedCount.Bounds=Scaled(new Rectangle(w-145,10,141,18));all.Top=Pixels(h-88);enlarge.Top=Pixels(h-44);remove.Location=Scaled(new Point(w-155,h-128));next.Location=Scaled(new Point(w-159,h-77));quickPrint.Location=Scaled(new Point(w-288,h-88));fileInfo.Bounds=Scaled(new Rectangle(290,h-66,Math.Max(50,w-590),60));};body.Resize+=bodyLayout;
-            FinishScreen();RefreshSelection();
+            FinishScreen();RefreshSelection();UpdateFolderWatchers();
         }
         void PaintBrowserFooter(object s,PaintEventArgs e){if(printingScreen)return;var bmp=Skin.GetImage("EPQImage/bmp_1-1-07.bmp");if(bmp!=null)e.Graphics.DrawImage(bmp,new Rectangle(Pixels(210),body.Height-Pixels(88),Math.Max(1,body.Width-Pixels(210)),Pixels(88)));e.Graphics.DrawLine(Pens.Silver,body.Width-Pixels(160),Pixels(3),body.Width-Pixels(5),Pixels(3));}
         void AddFolderNode(TreeNodeCollection nodes,string name,string path,int icon){if(String.IsNullOrEmpty(path))return;using(var shellIcon=FolderShellIcon.Read(path)){if(shellIcon!=null){folders.ImageList.Images.Add(shellIcon);icon=folders.ImageList.Images.Count-1;}}var node=new TreeNode(name){Tag=path,ImageIndex=icon,SelectedImageIndex=icon};node.Nodes.Add(new TreeNode(""));nodes.Add(node);}
         void LoadFolder(string path) { NavigateFolder(path,true); }
-        void ImportFiles(string[] files,bool select,bool recordFolderNavigation=true)
+        void ImportFiles(string[] files,bool select,bool recordFolderNavigation=true,bool background=false)
         {
+            browsingFolder=files!=null&&files.Length==1&&Directory.Exists(files[0]);
             if(importCancellation!=null){importCancellation.Cancel();importCancellation=null;importing=false;}
             var expanded=new List<string>();int invalid=0;bool limited=false;
             foreach(var entry in files??new string[0])try{if(Directory.Exists(entry)){currentFolder=FolderPath(entry);if(recordFolderNavigation)RecordFolderHistory(currentFolder);foreach(var path in Directory.EnumerateFiles(entry)){if(!PhotoEngine.CanDecode(path))continue;if(expanded.Count==999){limited=true;break;}expanded.Add(Path.GetFullPath(path));}}else if(PhotoEngine.CanDecode(entry)){if(expanded.Count==999){limited=true;break;}expanded.Add(Path.GetFullPath(entry));}}catch{invalid++;}
             expanded=expanded.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if(expanded.Count>32){LoadPhotoBatch(expanded,select,invalid,limited);return;}
+            if(expanded.Count>32){LoadPhotoBatch(expanded,select,invalid,limited,background);return;}
             var visible=new List<PhotoItem>();foreach(var path in expanded){var photo=AllPhotos.FirstOrDefault(p=>String.Equals(p.FilePath,path,StringComparison.OrdinalIgnoreCase));if(photo==null)try{photo=new PhotoItem(path);if(PhotoEngine.ValidateDimensions(photo.Width,photo.Height,loadMinimumImageSize)!=null){invalid++;continue;}AllPhotos.Add(photo);}catch{invalid++;continue;}visible.Add(photo);}
             FinishImport(visible,select,invalid,limited);
         }
@@ -212,7 +215,7 @@ namespace FrameSpool
             positioning=Ui.Skin(body,"Positioning","Image/btn_2-1-14_u.bmp",0,31,140,29,ShowPositioning);positioning.CaptionRectangle=new Rectangle(22,0,118,29);
             correction=Ui.Skin(body,"Image Correct","Image/btn_2-1-15_u.bmp",0,31,140,29,ShowCorrection);correction.CaptionRectangle=new Rectangle(22,0,118,29);
             var back=Ui.Skin(body,"Back","Image/btn_2-1-16_u.bmp",0,26,100,40,ReturnToBrowser);back.CaptionRectangle=new Rectangle(20,0,80,40);
-            preview=new PagePreview{Options=Options,EnableManual=manualMode};preview.PhotoFocused+=Focus;preview.PhotoDropped+=AssignManualPhoto;preview.PhotoMoved+=delegate(int from,int to){if(Pages.Count==0||from==to||from<0||to<0||CurrentLayout==null||to>=CurrentLayout.Frames.Count||from>=Pages[pageIndex].Photos.Count)return;var page=Pages[pageIndex];var photo=page.Photos[from];while(page.Photos.Count<=to)page.Photos.Add(null);page.Photos[from]=page.Photos[to];page.Photos[to]=photo;UpdatePage();};preview.SlotCleared+=delegate(int index){if(Pages.Count>0&&index>=0&&index<Pages[pageIndex].Photos.Count){Pages[pageIndex].Photos[index]=null;Focus(null);UpdatePage();}};body.Controls.Add(preview);
+            preview=new PagePreview{Options=Options,EnableManual=manualMode};preview.PhotoFocused+=Focus;preview.PhotoPositionChanged+=delegate{preview.RefreshScale();SyncPositioningControls();};preview.PhotoDropped+=AssignManualPhoto;preview.PhotoMoved+=delegate(int from,int to){if(Pages.Count==0||from==to||from<0||to<0||CurrentLayout==null||to>=CurrentLayout.Frames.Count||from>=Pages[pageIndex].Photos.Count)return;var page=Pages[pageIndex];var photo=page.Photos[from];while(page.Photos.Count<=to)page.Photos.Add(null);page.Photos[from]=page.Photos[to];page.Photos[to]=photo;UpdatePage();};preview.SlotCleared+=delegate(int index){if(Pages.Count>0&&index>=0&&index<Pages[pageIndex].Photos.Count){Pages[pageIndex].Photos[index]=null;Focus(null);UpdatePage();}};body.Controls.Add(preview);
             pageLabel=Ui.Label(body,"Page\r\n1/1",240,0,80,28);
             var previous=Ui.Skin(body,"","Image/btn_2-1-22_u.bmp",325,0,55,24,delegate{if(pageIndex>0){pageIndex--;UpdatePage();}});var following=Ui.Skin(body,"","Image/btn_2-1-23_u.bmp",390,0,55,24,delegate{if(pageIndex<Pages.Count-1){pageIndex++;UpdatePage();}});
             pageCopies=Ui.Number(body,480,0,51,0,99,1,delegate(int value){if(!updating&&Pages.Count>0){Pages[pageIndex].Copies=value;pageCopyCounts[pageIndex.ToString()]=value;UpdatePage();}});var pageWord=Ui.Label(body,"page",535,0,65,26);
@@ -222,7 +225,7 @@ namespace FrameSpool
             dateInfo=Ui.Check(body,Options.InfoFileName?"File Name":"Date",0,0,193,Options.PrintInfo,delegate(bool value){Options.PrintInfo=value;preview.RefreshScale();});
             var redeye=Ui.Button(body,"Fix Red-Eye All (Auto)",0,0,193,21,delegate{foreach(var p in Selected)p.Adjustments.AutoRedEye=true;UpdatePage();});
             var print=Ui.Skin(body,"Print","Image/btn_2-1-38_u.bmp",0,0,150,66,Print);print.CaptionRectangle=new Rectangle(0,48,150,16);print.TextPixelSize=14;
-            tips.SetToolTip(printer,"Choose a Windows printer, paper and driver properties.");tips.SetToolTip(positioning,"Adjust cropping, scale, rotation and placement.");tips.SetToolTip(correction,"Preview and apply corrections to printed photos.");tips.SetToolTip(pageCopies,"Copies of this page, from 0 to 99. Zero skips the page.");tips.SetToolTip(dateInfo,"Print the date or file name in layouts that support captions.");tips.SetToolTip(number,"Set copies separately for each page, or apply one count to all.");tips.SetToolTip(print,"Print the selected pages with their image corrections.");
+            tips.SetToolTip(preview,"Drag a photo to move it inside its frame. In Manual flow, drag between slots to rearrange photos.");tips.SetToolTip(printer,"Choose a Windows printer, paper and driver properties.");tips.SetToolTip(positioning,"Adjust cropping, scale, rotation and placement.");tips.SetToolTip(correction,"Preview and apply corrections to printed photos.");tips.SetToolTip(pageCopies,"Copies of this page, from 0 to 99. Zero skips the page.");tips.SetToolTip(dateInfo,"Print the date or file name in layouts that support captions.");tips.SetToolTip(number,"Set copies separately for each page, or apply one count to all.");tips.SetToolTip(print,"Print the selected pages with their image corrections.");
             body.Paint-=PaintBrowserFooter;body.Paint+=PaintPrintFooter;
             bodyLayout=delegate{if(!printingScreen||layouts.IsDisposed)return;ConfigureWorkspaceScroll();int w=Math.Max(784,(int)(body.ClientSize.Width/UiScale)),h=Math.Max(521,(int)(body.ClientSize.Height/UiScale));layouts.Height=Pixels(h-309);frame.Top=Pixels(h-40);fit.Left=Pixels(w-418);positioning.Left=Pixels(w-418);correction.Left=Pixels(w-268);back.Left=Pixels(w-118);preview.Bounds=Scaled(new Rectangle(240,76,w-266,h-221));pageLabel.Top=Pixels(h-140);previous.Top=Pixels(h-135);following.Top=Pixels(h-135);pageCopies.Top=Pixels(h-135);pageWord.Top=Pixels(h-135);inlineTrim.Top=inlineFit.Top=Pixels(h-109);inlineZoom.Top=Pixels(h-111);inlineZoomValue.Top=Pixels(h-109);number.Location=Scaled(new Point(w-174,h-140));totalLabel.Location=Scaled(new Point(w-363,h-80));dateInfo.Location=Scaled(new Point(w-363,h-50));redeye.Location=Scaled(new Point(w-363,h-25));print.Location=Scaled(new Point(w-156,h-78));};body.Resize+=bodyLayout;
             if(preferredFrame)frameLayoutRadio.Checked=true;FillLayouts(preferredFrame);FinishScreen();UpdatePage();UpdatePrinterSummary();
