@@ -40,9 +40,9 @@ jobs:
         with:
           name: FrameSpool-Windows
           path: |
-            dist/release/FrameSpool-0.2.5-win-x64.exe
-            dist/release/FrameSpool-0.2.5-win-x64.msi
-            dist/release/FrameSpool-0.2.5-win-x64-portable.zip
+            dist/release/FrameSpool-0.2.6-win-x64.exe
+            dist/release/FrameSpool-0.2.6-win-x64.msi
+            dist/release/FrameSpool-0.2.6-win-x64-portable.zip
             dist/release/LibRaw-0.22.2-source.zip
             dist/release/SHA256SUMS.txt
           if-no-files-found: error
@@ -82,5 +82,5 @@ jobs:
         run: |
           gh release view $env:GITHUB_REF_NAME > $null 2>&1
           if ($LASTEXITCODE -eq 0) { Write-Output 'Release already published.'; exit 0 }
-          gh release create $env:GITHUB_REF_NAME .\release\FrameSpool-0.2.5-win-x64.exe .\release\FrameSpool-0.2.5-win-x64.msi .\release\FrameSpool-0.2.5-win-x64-portable.zip .\release\LibRaw-0.22.2-source.zip .\release\SHA256SUMS.txt --verify-tag --title ("FrameSpool " + $env:GITHUB_REF_NAME) --notes-file .\source\RELEASE_NOTES.md
+          gh release create $env:GITHUB_REF_NAME .\release\FrameSpool-0.2.6-win-x64.exe .\release\FrameSpool-0.2.6-win-x64.msi .\release\FrameSpool-0.2.6-win-x64-portable.zip .\release\LibRaw-0.22.2-source.zip .\release\SHA256SUMS.txt --verify-tag --title ("FrameSpool " + $env:GITHUB_REF_NAME) --notes-file .\source\RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }

@@ -1,4 +1,4 @@
-param([ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version='0.2.5')
+param([ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version='0.2.6')
 $ErrorActionPreference='Stop'
 $taskApp=Join-Path $PSScriptRoot 'dist\FrameSpool'
 $taskRelease=Join-Path $PSScriptRoot 'dist\release'
