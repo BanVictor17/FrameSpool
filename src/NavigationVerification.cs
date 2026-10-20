@@ -81,15 +81,15 @@ namespace FrameSpool
                 check("Losing mouse capture ends positioning safely",!form.preview.IsDragging);
                 placed.OffsetX=placed.OffsetY=0;press(start);form.pageIndex=1;form.UpdatePage();drag(end);release(end);
                 check("Changing pages during a drag never moves another photo",placed.OffsetX==0&&placed.OffsetY==0&&form.FocusPhoto.OffsetX==0&&form.FocusPhoto.OffsetY==0&&!form.preview.IsDragging);
-                form.pageIndex=0;form.UpdatePage();form.ApplyDpi(144);sheet=form.preview.Sheet;frame=form.preview.LayoutDefinition.Frames[0];
+                form.pageIndex=0;form.UpdatePage();form.ApplyDpi(144);placed=form.preview.Page.Photos[0];form.Focus(placed);form.SetPhotoFit(false);sheet=form.preview.Sheet;frame=form.preview.LayoutDefinition.Frames[0];
                 start=new Point((int)(sheet.X+(frame.X+frame.Width/2)*sheet.Width),(int)(sheet.Y+(frame.Y+frame.Height/2)*sheet.Height));end=new Point(start.X+36,start.Y+27);
                 press(start);drag(end);release(end);
-                check("Crop dragging remains accurate after display scaling",Math.Abs(placed.OffsetX-36*form.CurrentLayout.Width/sheet.Width)<.01&&Math.Abs(placed.OffsetY-27*form.CurrentLayout.Height/sheet.Height)<.01);
+                checks.Add(new VerificationCheck{Name="Crop dragging remains accurate after display scaling",Passed=Math.Abs(placed.OffsetX-36*form.CurrentLayout.Width/sheet.Width)<.01&&Math.Abs(placed.OffsetY-27*form.CurrentLayout.Height/sheet.Height)<.01,Detail="Actual "+placed.OffsetX+", "+placed.OffsetY+"; expected "+36*form.CurrentLayout.Width/sheet.Width+", "+27*form.CurrentLayout.Height/sheet.Height+"; focused current placement "+(form.FocusPhoto==placed)});
                 var rotated=new FrameDesign{Width=1800,Height=1260,Paper="3.5x5"};rotated.Elements.Add(new FrameElement{X=.2f,Y=.2f,Width=.6f,Height=.6f,Rotation=90});
-                form.CurrentLayout=rotated.ToLayout();form.UpdatePage();placed.OffsetX=placed.OffsetY=0;sheet=form.preview.Sheet;
+                form.CurrentLayout=rotated.ToLayout();form.UpdatePage();placed=form.preview.Page.Photos[0];form.Focus(placed);placed.OffsetX=placed.OffsetY=0;sheet=form.preview.Sheet;
                 start=new Point((int)(sheet.X+sheet.Width/2),(int)(sheet.Y+sheet.Height/2));end=new Point(start.X+30,start.Y);
                 press(start);drag(end);release(end);
-                check("Photos follow the mouse inside rotated custom openings",Math.Abs(placed.OffsetX)<.01&&Math.Abs(placed.OffsetY+30*form.CurrentLayout.Height/sheet.Height)<.01);
+                checks.Add(new VerificationCheck{Name="Photos follow the mouse inside rotated custom openings",Passed=Math.Abs(placed.OffsetX)<.01&&Math.Abs(placed.OffsetY+30*form.CurrentLayout.Height/sheet.Height)<.01,Detail="Actual "+placed.OffsetX+", "+placed.OffsetY+"; expected 0, "+(-30*form.CurrentLayout.Height/sheet.Height)+"; focused current placement "+(form.FocusPhoto==placed)});
                 form.preview.EnableManual=true;var beforeManual=new PointF(placed.OffsetX,placed.OffsetY);press(start);release(start);
                 check("Manual flow still reserves dragging for slot placement",!form.preview.Capture&&placed.OffsetX==beforeManual.X&&placed.OffsetY==beforeManual.Y);
             }
